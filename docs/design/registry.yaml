@@ -1,0 +1,100 @@
+# Design Registry — Screen Specifications (P23 Price Monitor)
+
+screens:
+  - id: DS-01
+    name: Auth Login & Register
+    status: planned
+    route: /login
+    mock: docs/design/mocks/ds-01-auth.html
+    description: Clean authentication flow with tabbed Login and Register forms, password strength meter, remember me token, and demo account shortcuts for fast grading evaluation.
+    components:
+      - BrandHeader
+      - AuthCard
+      - EmailPasswordForm
+      - DemoAccountQuickFill
+      - SecurityNotice
+    states:
+      - default
+      - invalid-credentials
+      - account-locked
+      - loading
+
+  - id: DS-02
+    name: User Watchlist Dashboard
+    status: approved
+    route: /dashboard
+    mock: docs/design/mocks/ds-02-watchlist.html
+    description: Primary user screen featuring sneaker tracking cards with "Best Price" badge, real-time price drops, stock status, quick URL addition modal, filter chips, summary metrics, and circuit breaker notification banner.
+    components:
+      - AppNavigation
+      - ScraperStatusBanner
+      - MetricsHeroSummary
+      - WatchlistControls (Search, Filter, Sort, Add Product)
+      - SneakerCardGrid
+      - SneakerCard (Image, SKU monospace, Brand, Title 2-line clamp, Store badges, Best Price pill, Action buttons)
+      - EmptyStatePanel
+      - SkeletonLoaderCard
+      - AddProductModal
+    states:
+      - success (active sneaker cards with best price highlight)
+      - empty (zero tracked products with onboard CTA)
+      - loading (animated skeleton grid)
+      - error-banner (adapter circuit breaker / degraded notice)
+      - long-title (resilient 2-line clamping with full tooltip)
+
+  - id: DS-03
+    name: Product Detail & Price Comparison Chart
+    status: planned
+    route: /products/{sku}
+    mock: docs/design/mocks/ds-03-product-detail.html
+    description: In-depth product view comparing real-time offers across JD Sports, Sizeer, and Buzz Sneakers, featuring interactive Chart.js price history (weekly/monthly/all-time) and alert threshold slider.
+    components:
+      - BreadcrumbNav
+      - CanonicalProductHeader
+      - StoreComparisonTable (JD Sports, Sizeer, Buzz Sneakers)
+      - ChartJsPriceHistory
+      - AlertRuleEditor
+      - PriceDropStatistics
+    states:
+      - default
+      - single-store-only
+      - price-dropped
+      - out-of-stock-all
+
+  - id: DS-04
+    name: Notification & Profile Settings
+    status: planned
+    route: /settings
+    mock: docs/design/mocks/ds-04-settings.html
+    description: User notification channel preferences (Email toggle and Telegram Bot pairing instructions with Chat ID test trigger) and alert frequency rules.
+    components:
+      - ProfileSummary
+      - EmailNotificationSettings
+      - TelegramBotConnector
+      - RecentNotificationLogTable
+      - AccountSecurityForm
+    states:
+      - default
+      - telegram-connected
+      - telegram-pending
+      - test-notification-sent
+
+  - id: DS-05
+    name: Admin Scraper Health Dashboard
+    status: planned
+    route: /admin
+    mock: docs/design/mocks/ds-05-admin-health.html
+    description: Administrator operations panel for monitoring adapter health (Healthy/Degraded/Suspect/Circuit Open), inspecting drift anomalies, viewing/downloading HTML snapshots, and manual rescan triggering.
+    components:
+      - AdminNav
+      - AdapterHealthCards (JD Sports, Sizeer, Buzz Sneakers)
+      - CircuitBreakerToggles
+      - DriftAlertsTable
+      - HtmlSnapshotViewerModal
+      - PolitePollingConfigForm
+      - ManualRescanTrigger
+    states:
+      - all-healthy
+      - suspect-drift-alert
+      - circuit-breaker-open
+      - rescan-in-progress
