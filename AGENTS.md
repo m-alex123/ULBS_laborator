@@ -80,11 +80,14 @@ without new evidence. A rejected proposal is added there with the reason.
 ULBS laboratory coursework repository. Holds laboratory assignments, exercises, and project deliverables for university studies.
 
 ## 2. Stack and commands
-Stack to be determined based on laboratory requirements (see Q-001).
-Commands not run: fresh repository without build or test scripts configured yet.
+Python 3 cu FastAPI, Jinja2, Tailwind CSS, Chart.js, httpx, BeautifulSoup4, SQLite și pytest (conform D-001).
 
 ```bash
-# Commands to be configured once project stack is chosen (build, test, lint)
+# Executare teste automate
+pytest
+
+# Verificare integritate ledger
+python3 docs/agents/tools/ledger-lint.py
 ```
 
 ## 3. Layout

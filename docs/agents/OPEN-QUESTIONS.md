@@ -9,11 +9,12 @@
 <!-- graffino-agentic:end -->
 
 ## Index
-- Q-001 · Which stack, framework, and build tools should be used for this laboratory project?
+- Q-001 · Which stack, framework, and build tools should be used for this laboratory project? · _answered_
 
 ---
 
 ## Q-001 · Which stack, framework, and build tools should be used for this laboratory project?
-- **Status:** open
-- **Blocks:** project setup, dependencies, build/test commands, and initial implementation
+- **Status:** answered
+- **Answer:** Python 3 cu FastAPI (backend + pagini HTML Jinja2 + Tailwind CSS + Chart.js), httpx și BeautifulSoup4 pentru scraping etic (plus urllib.robotparser pentru verificarea robots.txt), SQLite pentru baza de date și pytest pentru teste automate.
+- **Answered:** 2026-11-19
 - **Who answers:** user
