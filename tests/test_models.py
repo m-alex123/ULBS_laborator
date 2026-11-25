@@ -406,6 +406,20 @@ def test_init_db_upgrades_pre_step3_schema_with_missing_columns(tmp_path, monkey
             conn.execute(
                 text(
                     """
+                    CREATE TABLE users (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        email VARCHAR(255) NOT NULL UNIQUE,
+                        password_hash VARCHAR(255) NOT NULL,
+                        role VARCHAR(20) NOT NULL,
+                        telegram_chat_id VARCHAR(64),
+                        created_at DATETIME NOT NULL
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
                     CREATE TABLE canonical_products (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         name VARCHAR(255) NOT NULL,
@@ -454,6 +468,12 @@ def test_init_db_upgrades_pre_step3_schema_with_missing_columns(tmp_path, monkey
             )
             conn.execute(
                 text(
+                    "INSERT INTO users (email, password_hash, role, created_at) "
+                    "VALUES ('legacy@pricemonitor.local', 'hash', 'user', '2026-11-20 00:00:00')"
+                )
+            )
+            conn.execute(
+                text(
                     "INSERT INTO canonical_products (name, brand, sku, created_at) "
                     "VALUES ('Nike Dunk', 'Nike', 'DD1391-100', '2026-11-20 00:00:00')"
                 )
@@ -475,8 +495,10 @@ def test_init_db_upgrades_pre_step3_schema_with_missing_columns(tmp_path, monkey
         init_db(engine)
         init_db(engine)
 
+        user_cols = {col["name"] for col in inspect(engine).get_columns("users")}
         site_cols = {col["name"] for col in inspect(engine).get_columns("site_configs")}
         listing_cols = {col["name"] for col in inspect(engine).get_columns("product_listings")}
+        assert {"email_enabled", "telegram_enabled"}.issubset(user_cols)
         assert "adapter_status" in site_cols
         assert {
             "match_needs_review",
@@ -488,8 +510,11 @@ def test_init_db_upgrades_pre_step3_schema_with_missing_columns(tmp_path, monkey
 
         TestSession = sessionmaker(bind=engine, autoflush=False, autocommit=False)
         with TestSession() as session:
+            legacy_user = session.query(User).filter_by(email="legacy@pricemonitor.local").one()
             cfg = session.query(SiteConfig).filter_by(store="jdsports").one()
             lst = session.query(ProductListing).filter_by(store="jdsports").one()
+            assert legacy_user.email_enabled is True
+            assert legacy_user.telegram_enabled is False
             assert cfg.adapter_status == "healthy"
             assert lst.match_needs_review is False
             assert lst.match_confidence is None
