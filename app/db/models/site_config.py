@@ -28,6 +28,10 @@ class SiteConfig(Base):
             "max_requests_per_hour >= 1 AND max_requests_per_hour <= 30",
             name="ck_site_configs_max_req",
         ),
+        CheckConstraint(
+            "adapter_status IN ('healthy', 'suspect', 'degraded', 'circuit_open')",
+            name="ck_site_configs_adapter_status",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -46,6 +50,9 @@ class SiteConfig(Base):
         Integer,
         default=lambda: settings.DEFAULT_MAX_REQUESTS_PER_HOUR,
         nullable=False,
+    )
+    adapter_status: Mapped[str] = mapped_column(
+        String(20), default="healthy", nullable=False
     )
     circuit_breaker_open: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

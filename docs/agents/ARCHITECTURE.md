@@ -20,11 +20,11 @@ Proiectul P23: Monitor de prețuri cu scraping etic pentru încălțăminte spor
   │     ├── db/                 (Session SQLite/PostgreSQL, modele ORM, seed idempotent)
   │     ├── services/           (Servicii domeniu, ex. watchlist_service.py)
   │     ├── web/                (Routere health/auth/watchlist, deps, Jinja2, static CSS/JS)
-  │     ├── scrapers/           (Step 3: adaptoare jdsports, sizeer, buzzsneakers)
-  │     └── worker/             (Step 3-4: scheduler, circuit breaker, drift detection)
+  │     ├── scraping/           (Step 3: price_parser, polite_client, adapters/, drift_detector, deduplicator)
+  │     └── worker/             (Step 4: scheduler & polling loop)
   ├── data/                     (Bază de date locală SQLite: pricemonitor.db)
   ├── storage/snapshots/        (Snapshot-uri HTML salvate la erori/derivă)
-  └── tests/                    (Teste unitare și integrare pytest)
+  └── tests/                    (Teste unitare, fixtures HTML și integrare pytest)
 ```
 
 ## Parts
@@ -35,15 +35,15 @@ Proiectul P23: Monitor de prețuri cu scraping etic pentru încălțăminte spor
 | Domain Services | app/services/ | Agregare watchlist, calcul cel mai mic preț, sparkline, filtrare/sortare | Web App, Database |
 | Security & Config | app/core/ | Setări mediu (`pydantic-settings`), hashing `bcrypt`, cookie-uri semnate HMAC-SHA256 | Web App, Database |
 | Database & Models | app/db/, data/ | Modele SQLAlchemy 2.0, engine dual SQLite / PostgreSQL 16, seed idempotent | Web App, Services |
-| Scraping Adapters (planned) | app/scrapers/ | Extragere date, politețe (delay $\ge$10s, rate limits), validare `robots.txt` | Magazine online |
-| Worker & Scheduler (planned) | app/worker/ | Rulare automată la 6 ore, detecție derivă, snapshots la eroare | Bază de date, Storage |
+| Ethical Scraping Engine | app/scraping/ | Parser pur RO (`price_parser`), client politicos `robots.txt` (`polite_client`), adaptoare (`adapters/`), detecție derivă (`drift_detector`), deduplicare SKU (`deduplicator`) | Magazine online, Database, Storage |
+| Worker & Scheduler (planned) | app/worker/ | Rulare programată automată la 6 ore și integrare alerte (Step 4-5) | Scraping Engine, Database |
 
 ## Data flow
 1. Utilizatorul adaugă un URL de produs în aplicație și configurează praguri de alertă.
-2. Worker-ul verifică programat la 6h magazinele (respectând `robots.txt`, limită de 30 req/h și delay 10s).
-3. Modulul de detecție a derivei validează plauzibilitatea citirii (scădere $<70\%$, preț $>50\text{ RON}$, similaritate titlu $>60\%$).
-4. Datele valide sunt salvate în SQLite și agregate pe produs canonic; citirile suspecte generează alertă pentru admin și snapshot HTML în `storage/snapshots/`.
-5. Dacă prețul scade sub prag sau produsul revine în stoc, utilizatorul este alertat prin Email și/sau Telegram.
+2. `PoliteHttpClient` verifică `robots.txt` (cache 24h, reguli wildcard `*`/`$`), pauza `>=10s`, plafonul `<=30 req/h` și circuit breaker-ul, apoi descarcă pagina cu `User-Agent` dedicat.
+3. Adaptorul specific magazinului (`jdsports`, `sizeer`, `buzzsneakers`) extrage datele normalizate folosind `price_parser` și le potrivește cross-site prin `deduplicator` (marcând potrivirile incerte cu `match_needs_review=True`).
+4. `drift_detector` validează plauzibilitatea citirii (`D-002`: scădere `<=70%`, creștere `<=200%`, preț `>=50 RON`, similaritate titlu `>=60%`).
+5. Datele valide sunt salvate în baza de date (`SiteConfig.adapter_status='healthy'`); citirile suspecte marchează adaptorul `suspect` în `SiteConfig`/`AdapterRunLog`, salvează snapshot HTML în `storage/snapshots/` și suprimă alertele către utilizatori.
 
 ## State and storage
 | What | Where | Owner | Notes |

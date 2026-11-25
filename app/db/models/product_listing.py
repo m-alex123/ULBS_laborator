@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Float, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, UTCDateTime
@@ -43,8 +43,18 @@ class ProductListing(Base):
         UTCDateTime(), nullable=True
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    match_needs_review: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    match_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    suggested_canonical_product_id: Mapped[int | None] = mapped_column(
+        ForeignKey("canonical_products.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
-    canonical_product: Mapped["CanonicalProduct"] = relationship(back_populates="listings")
+    canonical_product: Mapped["CanonicalProduct"] = relationship(
+        back_populates="listings",
+        foreign_keys=[canonical_product_id],
+    )
     price_history: Mapped[list["PriceHistory"]] = relationship(
         back_populates="product_listing",
         cascade="all, delete-orphan",
