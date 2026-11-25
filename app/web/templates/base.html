@@ -42,14 +42,21 @@
   {% set active_nav %}{% block active_nav %}{% endblock %}{% endset %}
   <header class="app-header">
     <div class="header-inner">
-      <a href="/watchlist" class="brand-block" aria-label="PriceMonitor Acasă">
+      <a href="{{ '/watchlist' if user else '/catalog' }}" class="brand-block" aria-label="PriceMonitor Acasă">
         <span class="brand-name">PriceMonitor</span>
         <span class="brand-tag">P23 ENGINE</span>
       </a>
 
-      {% if user %}
       <nav aria-label="Meniu principal">
         <ul class="nav-list">
+          <li>
+            <a
+              href="/catalog"
+              class="nav-item-link {% if active_nav == 'catalog' %}active{% endif %}"
+              {% if active_nav == 'catalog' %}aria-current="page"{% endif %}
+            >Catalog</a>
+          </li>
+          {% if user %}
           <li>
             <a
               href="/watchlist"
@@ -57,9 +64,9 @@
               {% if active_nav == 'watchlist' %}aria-current="page"{% endif %}
             >Watchlist</a>
           </li>
+          {% endif %}
         </ul>
       </nav>
-      {% endif %}
 
       <div class="header-actions">
         {% if user %}
@@ -71,6 +78,10 @@
           {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token }}">{% endif %}
           <button type="submit" class="logout-btn">Ieșire</button>
         </form>
+        {% elif not is_auth_page %}
+        <span class="role-pill guest-pill">MOD VIZITATOR · READ-ONLY</span>
+        <a href="/login" class="logout-btn">Autentificare</a>
+        <a href="/register" class="btn-market-primary btn-sm">Înregistrare</a>
         {% endif %}
         <button type="button" class="theme-toggle-btn" id="theme-btn" aria-label="Comută tema întunecată" aria-pressed="false">
           <span id="theme-symbol" aria-hidden="true">🌙</span>

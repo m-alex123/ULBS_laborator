@@ -395,3 +395,104 @@ def test_cascade_delete_product_listing_removes_history_and_nulls_notification_l
     assert preserved_notif is not None
     assert preserved_notif.product_listing_id is None
     assert preserved_notif.message_payload == "Produsul a revenit in stoc!"
+
+
+def test_init_db_upgrades_pre_step3_schema_with_missing_columns(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "SNAPSHOTS_DIR", tmp_path / "snapshots")
+    db_file = tmp_path / "legacy_pre_step3.db"
+    engine = create_db_engine(f"sqlite:///{db_file}")
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE canonical_products (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name VARCHAR(255) NOT NULL,
+                        brand VARCHAR(100) NOT NULL,
+                        sku VARCHAR(100) NOT NULL UNIQUE,
+                        image_url VARCHAR(1024),
+                        created_at DATETIME NOT NULL
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE site_configs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        store VARCHAR(32) NOT NULL UNIQUE,
+                        polling_interval_minutes INTEGER NOT NULL,
+                        min_delay_seconds INTEGER NOT NULL,
+                        max_requests_per_hour INTEGER NOT NULL,
+                        circuit_breaker_open BOOLEAN NOT NULL,
+                        updated_at DATETIME NOT NULL
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE product_listings (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        canonical_product_id INTEGER NOT NULL REFERENCES canonical_products(id) ON DELETE CASCADE,
+                        store VARCHAR(32) NOT NULL,
+                        url VARCHAR(1024) NOT NULL UNIQUE,
+                        current_price NUMERIC(10, 2),
+                        original_price NUMERIC(10, 2),
+                        raw_title VARCHAR(512) NOT NULL,
+                        image_url VARCHAR(1024),
+                        currency VARCHAR(10) NOT NULL,
+                        in_stock BOOLEAN NOT NULL,
+                        last_checked_at DATETIME,
+                        is_active BOOLEAN NOT NULL
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO canonical_products (name, brand, sku, created_at) "
+                    "VALUES ('Nike Dunk', 'Nike', 'DD1391-100', '2026-11-20 00:00:00')"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO site_configs (store, polling_interval_minutes, min_delay_seconds, max_requests_per_hour, circuit_breaker_open, updated_at) "
+                    "VALUES ('jdsports', 360, 10, 30, 0, '2026-11-20 00:00:00')"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO product_listings (canonical_product_id, store, url, current_price, raw_title, currency, in_stock, is_active) "
+                    "VALUES (1, 'jdsports', 'https://www.jdsports.ro/nike-dunk-dd1391-100', 549.99, 'Nike Dunk', 'RON', 1, 1)"
+                )
+            )
+
+        # Running init_db twice must idempotently add Step 3 columns without dropping data
+        init_db(engine)
+        init_db(engine)
+
+        site_cols = {col["name"] for col in inspect(engine).get_columns("site_configs")}
+        listing_cols = {col["name"] for col in inspect(engine).get_columns("product_listings")}
+        assert "adapter_status" in site_cols
+        assert {
+            "match_needs_review",
+            "match_confidence",
+            "suggested_canonical_product_id",
+        }.issubset(listing_cols)
+
+        from sqlalchemy.orm import sessionmaker
+
+        TestSession = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+        with TestSession() as session:
+            cfg = session.query(SiteConfig).filter_by(store="jdsports").one()
+            lst = session.query(ProductListing).filter_by(store="jdsports").one()
+            assert cfg.adapter_status == "healthy"
+            assert lst.match_needs_review is False
+            assert lst.match_confidence is None
+            assert lst.suggested_canonical_product_id is None
+    finally:
+        engine.dispose()

@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     DRIFT_MIN_VALID_PRICE_RON: float = 50.0
     DRIFT_MIN_TITLE_SIMILARITY: float = 0.60
 
+    # Background worker control (D-006; disabled by default in dev/tests)
+    ENABLE_BACKGROUND_WORKER: bool = False
+    WORKER_LOOP_SLEEP_SECONDS: int = Field(default=60, ge=5)
+
     # External notification channels (optional)
     TELEGRAM_BOT_TOKEN: str | None = None
     SMTP_HOST: str | None = None

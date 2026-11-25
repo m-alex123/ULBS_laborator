@@ -44,10 +44,11 @@ screens:
 
   - id: DS-03
     name: Product Detail & Price Comparison Chart
-    status: planned
-    route: /products/{sku}
+    status: implemented
+    route: /products/{canonical_id}
+    template: app/web/templates/product_detail.html
     mock: docs/design/mocks/ds-03-product-detail.html
-    description: In-depth product view comparing real-time offers across JD Sports, Sizeer, and Buzz Sneakers, featuring interactive Chart.js price history (weekly/monthly/all-time) and alert threshold slider.
+    description: In-depth public/authenticated product view comparing offers across JD Sports, Sizeer, and Buzz Sneakers, featuring Chart.js price history excluding suspect/error readings and auth-gated watchlist controls.
     components:
       - BreadcrumbNav
       - CanonicalProductHeader

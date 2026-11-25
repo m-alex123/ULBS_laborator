@@ -1,7 +1,7 @@
 # API & HTTP Routes — P23 Ethical Sneaker Price Monitor
 
 > Contract specification for the FastAPI web application (`app/main.py`).
-> Corresponding ledger contracts: `C-001`, `C-002`, `C-003` in [docs/agents/CONTRACTS.md](file:///home/manol/Work/ULBS_laborator/docs/agents/CONTRACTS.md).
+> Corresponding ledger contracts: `C-001`, `C-002`, `C-003`, `C-007`, `C-008`, `C-009` in [docs/agents/CONTRACTS.md](file:///home/manol/Work/ULBS_laborator/docs/agents/CONTRACTS.md).
 
 ---
 
@@ -69,3 +69,35 @@ Session state is stored in an `HttpOnly`, `SameSite=Lax` cookie (`SESSION_COOKIE
   - Circuit breaker alert banner when any `SiteConfig.circuit_breaker_open` is `true`
   - Sneaker cards with real HTTPS product photos (`object-fit: contain`), retailer attribution badge, photo source badge, offline SVG fallback, 2-line clamped title with tooltip, 7-point price sparkline SVG, and 3-store comparison table (`jdsports.ro`, `sizeer.ro`, `buzzsneakers.ro`)
   - Empty state panel when no watchlist items match.
+
+---
+
+## 4. Public Guest Catalog, Registration & DS-03 Product Detail (`C-007`)
+
+### `GET /register` and `POST /register`
+- **Auth:** Public (redirects `303 -> /watchlist` if already logged in).
+- **Behavior:** `POST /register` enforces CSRF (`verify_csrf_request`), validates email format and password length (`>= 12` characters, `<= 72` UTF-8 bytes), rejects duplicate emails with `409 Conflict`, hashes password with `bcrypt`, creates `User(role="user")`, sets `HttpOnly` session cookie, and redirects `303` → `/watchlist`.
+
+### `GET /catalog`
+- **Auth:** Public read-only (`get_current_user` optional).
+- **Query Parameters:** `q`, `store`, `sort` (same filter/sort semantics as `/watchlist`).
+- **Response:** `200 OK` (`text/html`) displaying all active `CanonicalProduct` cards, Guest read-only indicator (`MOD VIZITATOR · READ-ONLY`) + `/login` and `/register` links when unauthenticated, and links to `/products/{canonical_id}`.
+
+### `GET /products/{canonical_id}` (`DS-03`)
+- **Auth:** Public read-only (`get_current_user` optional).
+- **Responses:**
+  - `200 OK` (`text/html`): Side-by-side comparison across `jdsports.ro`, `sizeer.ro`, and `buzzsneakers.ro`, Chart.js + chronological history table strictly excluding `PriceHistory` rows with `status != 'valid'`, plus authenticated target-price/remove controls (or Guest login/register CTA).
+  - `404 Not Found` if `canonical_id` does not exist.
+
+---
+
+## 5. Watchlist URL Ingestion & Mutations (`C-008`)
+
+### `POST /watchlist`
+- **Auth & CSRF:** Required (`require_user`, `verify_csrf_request`; guests redirect `303 -> /login`).
+- **Form Fields:** `url` (supported `jdsports.ro`, `sizeer.ro`, `buzzsneakers.ro` product URL), `target_price` (optional RON decimal).
+- **Responses:** `303 -> /watchlist` on success; `400 Bad Request` re-rendering `watchlist.html` with error banner on unsupported domain, invalid URL, politeness refusal, or drift rejection.
+
+### `POST /watchlist/{canonical_id}/target` & `POST /watchlist/{canonical_id}/delete`
+- **Auth & CSRF:** Required (`require_user`, `verify_csrf_request`; guests redirect `303 -> /login`).
+- **Behavior:** Updates `target_price` (`303 -> /products/{canonical_id}`) or removes the user's `WatchlistItem` (`303 -> /watchlist`).

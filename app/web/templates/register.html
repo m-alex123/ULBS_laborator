@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Înregistrare — P23 Sneaker Price Monitor{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+  <section class="auth-card" aria-labelledby="register-heading">
+    <div class="auth-head">
+      <h1 id="register-heading">Creare Cont PriceMonitor</h1>
+      <p>Configurează propriul Watchlist și alerte pe jdsports.ro, sizeer.ro și buzzsneakers.ro</p>
+    </div>
+
+    {% if error %}
+    <div class="auth-error-banner" role="alert">
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/register" id="register-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      <div class="form-group">
+        <label for="reg-email" class="input-label">Email</label>
+        <input
+          type="email"
+          id="reg-email"
+          name="email"
+          class="text-input font-mono"
+          value="{{ email }}"
+          placeholder="student@ulbs.ro"
+          required
+          autocomplete="email"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="reg-password" class="input-label">Parolă (minim 12 caractere)</label>
+        <input
+          type="password"
+          id="reg-password"
+          name="password"
+          class="text-input"
+          placeholder="Minim 12 caractere"
+          minlength="12"
+          required
+          autocomplete="new-password"
+        >
+      </div>
+
+      <button type="submit" class="btn-market-primary" style="width: 100%; margin-top: var(--space-2);">
+        Creează cont și intră în Watchlist
+      </button>
+    </form>
+
+    <div class="auth-secondary-actions">
+      <a href="/catalog" class="btn-secondary-outline" style="width: 100%;">
+        Continuă ca Vizitator (Guest · Read-only)
+      </a>
+      <p class="auth-switch-link">
+        Ai deja cont? <a href="/login">Autentificare</a>
+      </p>
+    </div>
+  </section>
+</div>
+{% endblock %}

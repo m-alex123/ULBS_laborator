@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.name }} (SKU {{ product.sku }}) — P23 Price Monitor{% endblock %}
+
+{% block ticker %}
+<div class="market-ticker-strip" aria-label="Ticker activitate magazine partenere">
+  <div class="ticker-inner">
+    {% for item in ticker_items %}
+    <div class="ticker-item">
+      <span class="ticker-label {{ item.code }}">{{ item.label }}</span>
+      <span class="ticker-stat">{{ item.count }} listări · delay &ge; {{ item.min_delay }}s ·</span>
+      {% if item.circuit_breaker_open %}
+      <span class="ticker-change down"><span aria-hidden="true">▲ </span>Circuit Breaker activ</span>
+      {% else %}
+      <span class="ticker-change up"><span aria-hidden="true">● </span>Activ</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="main-wrapper">
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="{{ '/watchlist' if user else '/catalog' }}">{{ 'Watchlist' if user else 'Catalog Public' }}</a>
+    <span aria-hidden="true">/</span>
+    <span class="font-mono">{{ product.sku }}</span>
+  </nav>
+
+  {% if not user %}
+  <section class="guest-notice-banner" aria-label="Mod Vizitator Read-Only">
+    <div>
+      <strong class="font-mono">MOD VIZITATOR (READ-ONLY):</strong>
+      Comparativ și istoric accesibil public. <a href="/login">Autentifică-te</a> sau <a href="/register">creează un cont</a> pentru a salva produsul în Watchlist.
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="detail-hero">
+    <div class="detail-photo-stage card-photo-box">
+      {% if image_url %}
+      <img
+        class="sneaker-photo"
+        src="{{ image_url }}"
+        alt="{{ product.name }} (SKU {{ product.sku }})"
+        loading="eager"
+        referrerpolicy="no-referrer"
+      >
+      {% endif %}
+      <div class="photo-offline-fallback" {% if image_url %}hidden{% endif %}>
+        <svg aria-hidden="true"><use href="#icon-sneaker-offline"/></svg>
+        <span class="photo-offline-label">Imagine offline · fallback activ</span>
+        <span class="photo-offline-sku">SKU: {{ product.sku }}</span>
+      </div>
+      <span class="photo-source-badge">{{ photo_source_label }}</span>
+    </div>
+
+    <div class="detail-summary">
+      <div class="brand-sku-row">
+        <span class="card-brand">{{ product.brand | upper }}</span>
+        <span class="card-sku">SKU: {{ product.sku }}</span>
+      </div>
+
+      <h1 class="detail-title">{{ product.name }}</h1>
+
+      <div class="detail-price-callout">
+        <div>
+          <span class="ask-label">Cel mai mic preț valid acum</span>
+          <div class="detail-best-price">
+            {% if best_listing and best_listing.current_price is not none %}
+            {{ "%.2f"|format(best_listing.current_price) }} RON
+            {% else %}
+            N/A
+            {% endif %}
+          </div>
+          {% if best_listing %}
+          <span class="store-badge {{ best_store_code }}">{{ best_store_label }}</span>
+          {% endif %}
+          {% if best_discount_percent > 0 and best_savings_ron is not none %}
+          <span class="ask-diff">▼ -{{ best_discount_percent }}% ({{ "%.2f"|format(best_savings_ron) }} RON economie)</span>
+          {% endif %}
+        </div>
+
+        <div class="detail-stats-grid">
+          <div class="stat-cell">
+            <span class="stat-label">Minim istoric valid</span>
+            <span class="stat-val font-mono">{% if min_price is not none %}{{ "%.2f"|format(min_price) }} RON{% else %}—{% endif %}</span>
+          </div>
+          <div class="stat-cell">
+            <span class="stat-label">Medie istorică</span>
+            <span class="stat-val font-mono">{% if avg_price is not none %}{{ "%.2f"|format(avg_price) }} RON{% else %}—{% endif %}</span>
+          </div>
+          <div class="stat-cell">
+            <span class="stat-label">Maxim istoric valid</span>
+            <span class="stat-val font-mono">{% if max_price is not none %}{{ "%.2f"|format(max_price) }} RON{% else %}—{% endif %}</span>
+          </div>
+        </div>
+      </div>
+
+      {% if user %}
+      <div class="detail-watchlist-box">
+        <form method="post" action="/watchlist/{{ product.id }}/target" class="target-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <label for="detail-target-price" class="input-label">Prag alertă preț (RON)</label>
+          <div class="target-form-row">
+            <input
+              type="text"
+              id="detail-target-price"
+              name="target_price"
+              class="text-input font-mono"
+              value="{% if watchlist_item and watchlist_item.target_price is not none %}{{ '%.2f'|format(watchlist_item.target_price) }}{% endif %}"
+              placeholder="ex: 450.00"
+            >
+            <button type="submit" class="btn-market-primary">
+              {{ 'Actualizează prag' if watchlist_item else '+ Adaugă în Watchlist' }}
+            </button>
+          </div>
+        </form>
+        {% if watchlist_item %}
+        <form method="post" action="/watchlist/{{ product.id }}/delete" style="margin-top: var(--space-2);">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="logout-btn">Elimină din Watchlist</button>
+        </form>
+        {% endif %}
+      </div>
+      {% else %}
+      <div class="detail-watchlist-box">
+        <p class="empty-desc" style="text-align: left; margin-bottom: var(--space-2);">
+          Autentifică-te pentru a adăuga acest model în Watchlist și pentru a configura alerte de scădere de preț.
+        </p>
+        <div class="demo-btn-row">
+          <a href="/login" class="btn-market-primary">Autentificare</a>
+          <a href="/register" class="btn-secondary-outline">Înregistrare</a>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="detail-panel" aria-labelledby="comparison-heading">
+    <h2 id="comparison-heading" class="section-heading">Comparație Cross-Site (3 Retaileri)</h2>
+    <div class="table-scroll">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Magazin</th>
+            <th>Preț Curent</th>
+            <th>Preț Întreg</th>
+            <th>Reducere</th>
+            <th>Stoc</th>
+            <th>Ultima verificare</th>
+            <th>Link magazin</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in comparison_rows %}
+          <tr class="{% if row.is_lowest %}is-lowest-row{% endif %}">
+            <td><span class="store-badge {{ row.store_code }}">{{ row.store_label }}</span></td>
+            <td class="font-mono {% if row.is_lowest %}is-lowest{% endif %}">
+              {% if row.is_listed and row.current_price is not none %}
+              {{ "%.2f"|format(row.current_price) }} RON{% if row.is_lowest %} ★{% endif %}
+              {% else %}
+              <span style="color: var(--color-text-muted);">Nelistrat</span>
+              {% endif %}
+            </td>
+            <td class="font-mono">
+              {% if row.original_price is not none %}
+              <s>{{ "%.2f"|format(row.original_price) }} RON</s>
+              {% else %}
+              —
+              {% endif %}
+            </td>
+            <td class="font-mono">
+              {% if row.discount_percent > 0 %}
+              <span class="ask-diff">-{{ row.discount_percent }}%</span>
+              {% else %}
+              —
+              {% endif %}
+            </td>
+            <td>
+              {% if not row.is_listed %}
+              <span style="color: var(--color-text-muted);">—</span>
+              {% elif row.in_stock %}
+              <span class="ticker-change up">În stoc</span>
+              {% else %}
+              <span class="ticker-change down">Indisponibil</span>
+              {% endif %}
+            </td>
+            <td class="font-mono" style="font-size: var(--text-xs);">
+              {% if row.last_checked_at %}{{ row.last_checked_at.strftime("%Y-%m-%d %H:%M UTC") }}{% else %}—{% endif %}
+            </td>
+            <td>
+              {% if row.url %}
+              <a href="{{ row.url }}" target="_blank" rel="noopener noreferrer" class="btn-secondary-outline btn-sm">Deschide oferta ↗</a>
+              {% else %}
+              —
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="detail-panel" aria-labelledby="history-heading">
+    <div class="history-header-row">
+      <h2 id="history-heading" class="section-heading">Evoluție Istorică a Prețului</h2>
+      {% if excluded_suspect_count > 0 %}
+      <span class="role-pill" title="Citirile marcate suspect de detectorul de derivă sunt excluse">
+        {{ excluded_suspect_count }} citiri suspecte excluse
+      </span>
+      {% endif %}
+    </div>
+
+    <div class="chart-stage">
+      <canvas id="price-history-chart" height="110" aria-label="Grafic evoluție preț"></canvas>
+    </div>
+    <script type="application/json" id="price-history-data">{{ chart_payload | tojson }}</script>
+
+    {% if history_rows %}
+    <div class="table-scroll" style="margin-top: var(--space-4);">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Data (UTC)</th>
+            <th>Magazin</th>
+            <th>Preț Valid</th>
+            <th>Stoc</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in history_rows %}
+          <tr>
+            <td class="font-mono" style="font-size: var(--text-xs);">{{ h.recorded_at.strftime("%Y-%m-%d %H:%M") }}</td>
+            <td><span class="store-badge {{ h.store_code }}">{{ h.store_label }}</span></td>
+            <td class="font-mono">{{ "%.2f"|format(h.price) }} {{ h.currency }}</td>
+            <td>{% if h.in_stock %}În stoc{% else %}Indisponibil{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty-desc" style="text-align: left;">Nu există încă observații valide în istoric.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  var dataEl = document.getElementById('price-history-data');
+  var canvas = document.getElementById('price-history-chart');
+  if (!dataEl || !canvas || typeof Chart === 'undefined') return;
+  try {
+    var payload = JSON.parse(dataEl.textContent || '{}');
+    if (!payload.labels || !payload.labels.length) return;
+    new Chart(canvas.getContext('2d'), {
+      type: 'line',
+      data: payload,
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        scales: { y: { ticks: { callback: function (v) { return v + ' RON'; } } } }
+      }
+    });
+  } catch (_) {}
+})();
+</script>
+{% endblock %}

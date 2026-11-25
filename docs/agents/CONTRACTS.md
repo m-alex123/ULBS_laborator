@@ -15,6 +15,9 @@
 - C-004 · Polite HTTP Client & robots.txt Enforcement Contract · provided
 - C-005 · Store Adapter & Pure Price Parser Contract · provided
 - C-006 · Drift Detection, Snapshot Persistence & Cross-Site Deduplication Contract · provided
+- C-007 · Public Guest Catalog & DS-03 Product Comparison Contract · provided
+- C-008 · Authenticated Watchlist Mutation & URL Ingestion Contract · provided
+- C-009 · Background Scraper Worker & CLI Cycle Contract · provided
 
 ---
 
@@ -55,6 +58,24 @@
 - **Confirmed:** 2026-11-25
 - **Interface:** `check_plausibility` and `record_scrape_outcome` enforce `D-002` thresholds (`>70%` drop, `>200%` rise, `<50 RON`, title similarity `<60%`, missing required fields), mark `SiteConfig.adapter_status = 'suspect'` and `AdapterRunLog(status='suspect')`, save HTML snapshots in `storage/snapshots/`, preserve last valid `ProductListing` values, and return `should_notify_users=False` on drift/error; `resolve_canonical_product` and `upsert_scraped_listing` normalize SKUs across retailers and flag uncertain fuzzy matches via `ProductListing.match_needs_review=True` and `suggested_canonical_product_id`.
 - **Evidence:** Implemented in [app/scraping/drift_detector.py](file:///home/manol/Work/ULBS_laborator/app/scraping/drift_detector.py) and [app/scraping/deduplicator.py](file:///home/manol/Work/ULBS_laborator/app/scraping/deduplicator.py); tested in [tests/test_drift_detector.py](file:///home/manol/Work/ULBS_laborator/tests/test_drift_detector.py) and [tests/test_deduplicator.py](file:///home/manol/Work/ULBS_laborator/tests/test_deduplicator.py).
+
+### C-007 · Public Guest Catalog & DS-03 Product Comparison Contract
+- **Status:** approved
+- **Confirmed:** 2026-11-25
+- **Interface:** `GET /catalog` (`?q=&store=&sort=`) and `GET /products/{canonical_id}` allow unauthenticated read-only browsing (`get_current_user`), render Guest mode indicators (`MOD VIZITATOR · READ-ONLY`) plus `/login` and `/register` CTAs when `user is None`, compare active listings across `jdsports`, `sizeer`, and `buzzsneakers` highlighting the lowest valid in-stock price, and exclude `PriceHistory` rows with `status != 'valid'` from min/max/avg statistics and chart series; `GET /register` and `POST /register` create `role="user"` accounts with `>=12`-character passwords.
+- **Evidence:** Implemented in [app/web/routers/catalog.py](file:///home/manol/Work/ULBS_laborator/app/web/routers/catalog.py), [app/web/routers/auth.py](file:///home/manol/Work/ULBS_laborator/app/web/routers/auth.py), and [app/services/watchlist_service.py](file:///home/manol/Work/ULBS_laborator/app/services/watchlist_service.py); documented in [API.md](file:///home/manol/Work/ULBS_laborator/API.md); tested in [tests/test_guest_and_product_detail.py](file:///home/manol/Work/ULBS_laborator/tests/test_guest_and_product_detail.py).
+
+### C-008 · Authenticated Watchlist Mutation & URL Ingestion Contract
+- **Status:** approved
+- **Confirmed:** 2026-11-25
+- **Interface:** `POST /watchlist` (`url`, optional `target_price`), `POST /watchlist/{canonical_id}/target`, and `POST /watchlist/{canonical_id}/delete` enforce `require_user` (`303 -> /login` for guests) and `verify_csrf_request`, validate retailer domains, reuse existing listings or run injectable `PoliteHttpClient` → adapter → `check_plausibility` → `upsert_scraped_listing` → `record_scrape_outcome`, and persist user-scoped `WatchlistItem` changes.
+- **Evidence:** Implemented in [app/services/ingestion_service.py](file:///home/manol/Work/ULBS_laborator/app/services/ingestion_service.py) and [app/web/routers/watchlist.py](file:///home/manol/Work/ULBS_laborator/app/web/routers/watchlist.py); documented in [API.md](file:///home/manol/Work/ULBS_laborator/API.md); tested in [tests/test_watchlist_ingestion.py](file:///home/manol/Work/ULBS_laborator/tests/test_watchlist_ingestion.py).
+
+### C-009 · Background Scraper Worker & CLI Cycle Contract
+- **Status:** approved
+- **Confirmed:** 2026-11-25
+- **Interface:** `run_scrape_cycle(db, *, polite_client=None, force=False, now=None)` iterates active `ProductListing` rows respecting `SiteConfig.circuit_breaker_open`, polling intervals, and `PoliteHttpClient` rate limits, returning `ScrapeCycleSummary`; `python -m app.worker.runner --once` executes a single forced cycle and `settings.ENABLE_BACKGROUND_WORKER` (`False` by default) gates optional FastAPI lifespan background scheduling.
+- **Evidence:** Implemented in [app/worker/runner.py](file:///home/manol/Work/ULBS_laborator/app/worker/runner.py) and [app/main.py](file:///home/manol/Work/ULBS_laborator/app/main.py); tested in [tests/test_worker_runner.py](file:///home/manol/Work/ULBS_laborator/tests/test_worker_runner.py).
 
 ## Consumed
 

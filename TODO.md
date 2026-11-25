@@ -28,11 +28,14 @@
   - [x] `buzzsneakers.ro` adapter (`app/scraping/adapters/buzzsneakers.py`)
 - [x] P23 Drift detection engine (`>70%` drop, `>200%` rise, `<50 RON`, title similarity `<60%`, missing fields) & HTML snapshot persistence in `storage/snapshots/` (`app/scraping/drift_detector.py`)
 - [x] Cross-site SKU normalization & fuzzy deduplication engine with uncertain-match admin flag (`app/scraping/deduplicator.py`)
-- [ ] `POST /watchlist` URL ingestion web route wiring
+- [x] `POST /watchlist` URL ingestion & watchlist item mutations (`app/services/ingestion_service.py`, `app/web/routers/watchlist.py`)
 
-## Phase 4 · Scheduled Worker, Circuit Breaker & Admin Dashboard (Step 4)
-- [ ] Scheduled polling worker loop (`app/worker/`) & automatic circuit breaker state transitions
+## Phase 4 · Guest Mode, DS-03 Comparison, Background Worker & Admin Dashboard (Step 4)
+- [x] Guest read-only catalog (`GET /catalog`), "Continue as Guest" on `/login`, and public `GET/POST /register` (`app/web/routers/catalog.py`, `auth.py`)
+- [x] `DS-03` Product Detail & Chart.js cross-site price history excluding `suspect` entries (`GET /products/{canonical_id}`)
+- [x] Scheduled polling worker runner & CLI `--once` entrypoint (`app/worker/runner.py`)
 - [ ] `DS-05` Admin Health Dashboard (`/admin`) with snapshot viewer, uncertain-match review confirmation, manual rescan trigger, and polling config editor
+- [ ] Automatic circuit breaker auto-trip transitions on consecutive upstream failures
 
 ## Phase 5 · Product Detail, Settings & Alerts (Step 5)
 - [ ] `DS-03` Product Detail & Chart.js price history (`/products/{sku}`)
