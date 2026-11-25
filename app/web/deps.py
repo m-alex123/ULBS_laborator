@@ -1,14 +1,16 @@
+from collections.abc import Generator
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.security import decode_session_token, verify_csrf_token
+from app.core.security import create_csrf_token, decode_session_token, verify_csrf_token
 from app.db.models import User
 from app.db.session import get_db
+from app.scraping.polite_client import PoliteHttpClient
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -18,6 +20,55 @@ CSRF_COOKIE_NAME = "p23_csrf"
 def is_secure_cookie_env() -> bool:
     """Enable Secure cookies for all non-local environments."""
     return settings.ENVIRONMENT.strip().lower() not in {"development", "dev", "test", "local"}
+
+
+def set_csrf_cookie(response: Response, token: str) -> None:
+    """Set the double-submit CSRF cookie with consistent security flags."""
+    response.set_cookie(
+        key=CSRF_COOKIE_NAME,
+        value=token,
+        max_age=settings.SESSION_MAX_AGE_SECONDS,
+        httponly=False,
+        samesite="lax",
+        secure=is_secure_cookie_env(),
+        path="/",
+    )
+
+
+def ensure_csrf_cookie(request: Request, response: Response, csrf_token: str) -> None:
+    """Ensure the browser has a CSRF cookie matching the rendered form token."""
+    if CSRF_COOKIE_NAME not in request.cookies:
+        set_csrf_cookie(response, csrf_token)
+
+
+def resolve_csrf_token(request: Request) -> str:
+    """Reuse existing valid CSRF cookie token or issue a fresh signed token."""
+    existing = request.cookies.get(CSRF_COOKIE_NAME)
+    if existing and verify_csrf_token(existing, settings.SECRET_KEY):
+        return existing
+    return create_csrf_token(settings.SECRET_KEY)
+
+
+def set_session_cookie(response: Response, token: str) -> None:
+    """Attach the signed HttpOnly session cookie to an auth response."""
+    response.set_cookie(
+        key=settings.SESSION_COOKIE_NAME,
+        value=token,
+        max_age=settings.SESSION_MAX_AGE_SECONDS,
+        httponly=True,
+        samesite="lax",
+        secure=is_secure_cookie_env(),
+        path="/",
+    )
+
+
+def get_polite_client() -> Generator[PoliteHttpClient, None, None]:
+    """Provide a PoliteHttpClient instance (overridable in FastAPI tests)."""
+    client = PoliteHttpClient()
+    try:
+        yield client
+    finally:
+        client.close()
 
 
 def verify_csrf_request(request: Request, form_csrf_token: str | None = None) -> None:

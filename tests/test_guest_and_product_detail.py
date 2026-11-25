@@ -120,11 +120,12 @@ def test_register_creates_user_with_strong_password_and_sets_session_cookie(clie
     assert get_reg.status_code == 200
     assert 'name="email"' in get_reg.text
     assert 'name="password"' in get_reg.text
+    csrf_tok = test_client.cookies.get("p23_csrf")
 
     # Reject short password (<12 chars)
     weak_resp = test_client.post(
         "/register",
-        data={"email": "newstudent@ulbs.ro", "password": "Short123!"},
+        data={"email": "newstudent@ulbs.ro", "password": "Short123!", "csrf_token": csrf_tok},
         follow_redirects=False,
     )
     assert weak_resp.status_code == 400
@@ -133,7 +134,11 @@ def test_register_creates_user_with_strong_password_and_sets_session_cookie(clie
     # Reject duplicate email
     dup_resp = test_client.post(
         "/register",
-        data={"email": settings.SEED_USER_EMAIL, "password": "StrongPassword2026!"},
+        data={
+            "email": settings.SEED_USER_EMAIL,
+            "password": "StrongPassword2026!",
+            "csrf_token": csrf_tok,
+        },
         follow_redirects=False,
     )
     assert dup_resp.status_code == 409
@@ -141,7 +146,11 @@ def test_register_creates_user_with_strong_password_and_sets_session_cookie(clie
     # Valid registration creates role='user' and auto-logs into /watchlist
     ok_resp = test_client.post(
         "/register",
-        data={"email": "NewStudent@ulbs.ro", "password": "StrongPassword2026!"},
+        data={
+            "email": "NewStudent@ulbs.ro",
+            "password": "StrongPassword2026!",
+            "csrf_token": csrf_tok,
+        },
         follow_redirects=False,
     )
     assert ok_resp.status_code == 303

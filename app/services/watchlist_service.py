@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from urllib.parse import urlparse
 
@@ -57,6 +58,7 @@ class WatchlistCardVM:
     sparkline: SparklineVM
     listings: list[ListingRowVM]
     created_at_ts: float
+    in_watchlist: bool = False
 
 
 def _safe_image_url(url: str | None) -> str | None:
@@ -130,14 +132,8 @@ def _compute_discount(
     return pct, savings
 
 
-def get_watchlist_dashboard_data(
-    db: Session,
-    user_id: int,
-    q: str = "",
-    store: str = "all",
-    sort: str = "lowest_price",
-) -> dict[str, object]:
-    """Load DB-backed watchlist cards, store filter counts, ticker items, and CB alerts."""
+def _get_site_strip_data(db: Session) -> tuple[list[dict[str, object]], list[dict[str, str]]]:
+    """Load retailer ticker metrics and open circuit breaker notices."""
     site_configs = db.scalars(select(SiteConfig).order_by(SiteConfig.id)).all()
     circuit_breakers = [
         {
@@ -170,15 +166,41 @@ def get_watchlist_dashboard_data(
                 "circuit_breaker_open": cfg.circuit_breaker_open,
             }
         )
+    return ticker_items, circuit_breakers
 
-    stmt = (
-        select(WatchlistItem)
-        .where(WatchlistItem.user_id == user_id)
-        .options(
-            selectinload(WatchlistItem.canonical_product).selectinload(CanonicalProduct.listings)
+
+def _pick_best_listing(active_listings: list[ProductListing]) -> ProductListing | None:
+    priced_in_stock = [
+        lst for lst in active_listings
+        if lst.in_stock and lst.current_price is not None and lst.current_price > 0
+    ]
+    if priced_in_stock:
+        return min(
+            priced_in_stock,
+            key=lambda lst: (lst.current_price, lst.store),  # type: ignore[arg-type]
         )
-    )
-    watchlist_items = db.scalars(stmt).all()
+    priced_any = [
+        lst for lst in active_listings
+        if lst.current_price is not None and lst.current_price > 0
+    ]
+    if priced_any:
+        return min(
+            priced_any,
+            key=lambda lst: (lst.current_price, lst.store),  # type: ignore[arg-type]
+        )
+    return None
+
+
+def _build_cards_dashboard_payload(
+    db: Session,
+    product_entries: list[tuple[CanonicalProduct, float, bool]],
+    *,
+    q: str = "",
+    store: str = "all",
+    sort: str = "lowest_price",
+) -> dict[str, object]:
+    """Shared card filtering, sorting, sparkline query, and ticker assembly for DS-02/Catalog."""
+    ticker_items, circuit_breakers = _get_site_strip_data(db)
 
     normalized_query = q.strip().lower()
     normalized_store = store.strip().lower() if store else "all"
@@ -189,14 +211,12 @@ def get_watchlist_dashboard_data(
     if normalized_sort not in ("lowest_price", "biggest_discount", "recent"):
         normalized_sort = "lowest_price"
 
-    total_count = len(watchlist_items)
+    total_count = len(product_entries)
 
-    # First pass: determine matching items and best listings so history is fetched only for them
-    selected_entries: list[tuple[WatchlistItem, list[ProductListing], ProductListing | None]] = []
+    selected_entries: list[tuple[CanonicalProduct, float, bool, list[ProductListing], ProductListing | None]] = []
     best_listing_ids: list[int] = []
 
-    for item in watchlist_items:
-        product = item.canonical_product
+    for product, sort_ts, in_watchlist in product_entries:
         active_listings = [lst for lst in product.listings if lst.is_active]
 
         if normalized_query:
@@ -207,29 +227,10 @@ def get_watchlist_dashboard_data(
         if normalized_store != "all" and not any(lst.store == normalized_store for lst in active_listings):
             continue
 
-        priced_in_stock = [
-            lst for lst in active_listings
-            if lst.in_stock and lst.current_price is not None and lst.current_price > 0
-        ]
-        priced_any = [
-            lst for lst in active_listings
-            if lst.current_price is not None and lst.current_price > 0
-        ]
-        best_listing: ProductListing | None = None
-        if priced_in_stock:
-            best_listing = min(
-                priced_in_stock,
-                key=lambda lst: (lst.current_price, lst.store),  # type: ignore[arg-type]
-            )
-        elif priced_any:
-            best_listing = min(
-                priced_any,
-                key=lambda lst: (lst.current_price, lst.store),  # type: ignore[arg-type]
-            )
-
+        best_listing = _pick_best_listing(active_listings)
         if best_listing is not None:
             best_listing_ids.append(best_listing.id)
-        selected_entries.append((item, active_listings, best_listing))
+        selected_entries.append((product, sort_ts, in_watchlist, active_listings, best_listing))
 
     history_by_listing: dict[int, list[Decimal]] = {}
     if best_listing_ids:
@@ -261,8 +262,7 @@ def get_watchlist_dashboard_data(
             history_by_listing.setdefault(listing_id, []).append(price)
 
     cards: list[WatchlistCardVM] = []
-    for item, active_listings, best_listing in selected_entries:
-        product = item.canonical_product
+    for product, sort_ts, in_watchlist, active_listings, best_listing in selected_entries:
         safe_img = _safe_image_url(product.image_url)
 
         best_price = best_listing.current_price if best_listing else None
@@ -321,7 +321,8 @@ def get_watchlist_dashboard_data(
                 savings_ron=savings,
                 sparkline=build_sparkline(history_prices),
                 listings=listing_rows,
-                created_at_ts=item.created_at.timestamp(),
+                created_at_ts=sort_ts,
+                in_watchlist=in_watchlist,
             )
         )
 
@@ -347,3 +348,298 @@ def get_watchlist_dashboard_data(
         "ticker_items": ticker_items,
         "circuit_breakers": circuit_breakers,
     }
+
+
+def get_watchlist_dashboard_data(
+    db: Session,
+    user_id: int,
+    q: str = "",
+    store: str = "all",
+    sort: str = "lowest_price",
+) -> dict[str, object]:
+    """Load DB-backed watchlist cards for an authenticated user."""
+    stmt = (
+        select(WatchlistItem)
+        .where(WatchlistItem.user_id == user_id)
+        .options(
+            selectinload(WatchlistItem.canonical_product).selectinload(CanonicalProduct.listings)
+        )
+    )
+    watchlist_items = db.scalars(stmt).all()
+    entries = [
+        (item.canonical_product, item.created_at.timestamp(), True)
+        for item in watchlist_items
+    ]
+    return _build_cards_dashboard_payload(db, entries, q=q, store=store, sort=sort)
+
+
+def get_public_catalog_data(
+    db: Session,
+    *,
+    q: str = "",
+    store: str = "all",
+    sort: str = "lowest_price",
+    user_id: int | None = None,
+) -> dict[str, object]:
+    """Load public read-only canonical catalog cards for Guest or authenticated browsing."""
+    products = db.scalars(
+        select(CanonicalProduct)
+        .options(selectinload(CanonicalProduct.listings))
+        .order_by(CanonicalProduct.id.asc())
+    ).all()
+    watched_ids: set[int] = set()
+    if user_id is not None:
+        watched_ids = set(
+            db.scalars(
+                select(WatchlistItem.canonical_product_id).where(WatchlistItem.user_id == user_id)
+            ).all()
+        )
+    entries = [
+        (prod, prod.created_at.timestamp(), prod.id in watched_ids)
+        for prod in products
+        if any(lst.is_active for lst in prod.listings)
+    ]
+    return _build_cards_dashboard_payload(db, entries, q=q, store=store, sort=sort)
+
+
+def get_product_detail_data(
+    db: Session,
+    canonical_id: int,
+    *,
+    user_id: int | None = None,
+) -> dict[str, object] | None:
+    """Build DS-03 comparison and suspect-free chronological price history for a product."""
+    product = db.scalar(
+        select(CanonicalProduct)
+        .where(CanonicalProduct.id == canonical_id)
+        .options(selectinload(CanonicalProduct.listings))
+    )
+    if product is None:
+        return None
+
+    ticker_items, circuit_breakers = _get_site_strip_data(db)
+    active_listings = [lst for lst in product.listings if lst.is_active]
+    listings_by_store = {lst.store: lst for lst in active_listings}
+    best_listing = _pick_best_listing(active_listings)
+
+    comparison_rows: list[dict[str, object]] = []
+    for store_key, meta in STORE_META.items():
+        lst = listings_by_store.get(store_key)
+        if lst is None:
+            comparison_rows.append(
+                {
+                    "store": store_key,
+                    "store_code": meta["code"],
+                    "store_label": meta["label"],
+                    "domain": meta["domain"],
+                    "is_listed": False,
+                    "url": None,
+                    "current_price": None,
+                    "original_price": None,
+                    "discount_percent": 0,
+                    "savings_ron": None,
+                    "in_stock": False,
+                    "is_lowest": False,
+                    "last_checked_at": None,
+                    "raw_title": None,
+                }
+            )
+            continue
+
+        pct, savings = _compute_discount(lst.current_price, lst.original_price)
+        comparison_rows.append(
+            {
+                "store": store_key,
+                "store_code": meta["code"],
+                "store_label": meta["label"],
+                "domain": meta["domain"],
+                "is_listed": True,
+                "url": lst.url,
+                "current_price": lst.current_price,
+                "original_price": lst.original_price,
+                "discount_percent": pct,
+                "savings_ron": savings,
+                "in_stock": lst.in_stock,
+                "is_lowest": bool(
+                    best_listing and best_listing.in_stock and lst.id == best_listing.id
+                ),
+                "last_checked_at": lst.last_checked_at,
+                "raw_title": lst.raw_title,
+            }
+        )
+
+    listing_ids = [lst.id for lst in active_listings]
+    listing_store_map = {lst.id: lst.store for lst in active_listings}
+
+    valid_history_rows: list[PriceHistory] = []
+    excluded_suspect_count = 0
+    if listing_ids:
+        valid_history_rows = list(
+            db.scalars(
+                select(PriceHistory)
+                .where(
+                    PriceHistory.product_listing_id.in_(listing_ids),
+                    PriceHistory.status == "valid",
+                    PriceHistory.price.is_not(None),
+                )
+                .order_by(PriceHistory.recorded_at.asc(), PriceHistory.id.asc())
+            ).all()
+        )
+        excluded_suspect_count = int(
+            db.scalar(
+                select(func.count(PriceHistory.id)).where(
+                    PriceHistory.product_listing_id.in_(listing_ids),
+                    PriceHistory.status == "suspect",
+                )
+            )
+            or 0
+        )
+
+    valid_prices = [row.price for row in valid_history_rows if row.price is not None]
+    min_price = min(valid_prices) if valid_prices else None
+    max_price = max(valid_prices) if valid_prices else None
+    avg_price = (
+        (sum(valid_prices) / Decimal(len(valid_prices))).quantize(Decimal("0.01"))
+        if valid_prices
+        else None
+    )
+
+    # Chart.js dataset grouped by store using strictly valid PriceHistory rows
+    date_labels: list[str] = []
+    seen_dates: set[str] = set()
+    points_by_store_date: dict[str, dict[str, float]] = {k: {} for k in STORE_META}
+    history_table_rows: list[dict[str, object]] = []
+
+    for row in valid_history_rows:
+        store_key = listing_store_map.get(row.product_listing_id, "jdsports")
+        meta = STORE_META.get(store_key, {"code": "jd", "label": store_key.upper()})
+        date_label = row.recorded_at.strftime("%Y-%m-%d %H:%M")
+        if date_label not in seen_dates:
+            seen_dates.add(date_label)
+            date_labels.append(date_label)
+        if row.price is not None:
+            points_by_store_date.setdefault(store_key, {})[date_label] = float(row.price)
+
+        history_table_rows.append(
+            {
+                "recorded_at": row.recorded_at,
+                "store_code": meta["code"],
+                "store_label": meta["label"],
+                "price": row.price,
+                "currency": row.currency,
+                "in_stock": row.in_stock,
+            }
+        )
+
+    history_table_rows.reverse()
+
+    store_colors = {
+        "jdsports": "#006340",
+        "sizeer": "#B54708",
+        "buzzsneakers": "#D92D20",
+    }
+    chart_datasets = []
+    for store_key, meta in STORE_META.items():
+        store_map = points_by_store_date.get(store_key, {})
+        if not store_map:
+            continue
+        chart_datasets.append(
+            {
+                "label": meta["label"],
+                "data": [store_map.get(lbl) for lbl in date_labels],
+                "borderColor": store_colors.get(store_key, "#0D0D0D"),
+                "backgroundColor": store_colors.get(store_key, "#0D0D0D"),
+                "spanGaps": True,
+                "tension": 0.25,
+            }
+        )
+
+    watchlist_item: WatchlistItem | None = None
+    if user_id is not None:
+        watchlist_item = db.scalar(
+            select(WatchlistItem).where(
+                WatchlistItem.user_id == user_id,
+                WatchlistItem.canonical_product_id == product.id,
+            )
+        )
+
+    safe_img = _safe_image_url(product.image_url)
+    best_discount, best_savings = _compute_discount(
+        best_listing.current_price if best_listing else None,
+        best_listing.original_price if best_listing else None,
+    )
+    best_meta = STORE_META.get(best_listing.store if best_listing else "", {"code": "", "label": ""})
+
+    return {
+        "product": product,
+        "image_url": safe_img,
+        "photo_source_label": _derive_photo_source_label(safe_img),
+        "best_listing": best_listing,
+        "best_store_code": best_meta["code"],
+        "best_store_label": best_meta["label"],
+        "best_discount_percent": best_discount,
+        "best_savings_ron": best_savings,
+        "in_stock_any": any(lst.in_stock for lst in active_listings),
+        "comparison_rows": comparison_rows,
+        "min_price": min_price,
+        "max_price": max_price,
+        "avg_price": avg_price,
+        "excluded_suspect_count": excluded_suspect_count,
+        "history_rows": history_table_rows,
+        "sparkline": build_sparkline(valid_prices[-12:], width=240, height=56),
+        "chart_payload": {"labels": date_labels, "datasets": chart_datasets},
+        "watchlist_item": watchlist_item,
+        "ticker_items": ticker_items,
+        "circuit_breakers": circuit_breakers,
+    }
+
+
+def set_watchlist_target(
+    db: Session,
+    *,
+    user_id: int,
+    canonical_product_id: int,
+    target_price: Decimal | None,
+) -> WatchlistItem | None:
+    """Create or update a user's WatchlistItem target price for a CanonicalProduct."""
+    product = db.get(CanonicalProduct, canonical_product_id)
+    if product is None:
+        return None
+    item = db.scalar(
+        select(WatchlistItem).where(
+            WatchlistItem.user_id == user_id,
+            WatchlistItem.canonical_product_id == canonical_product_id,
+        )
+    )
+    if item is None:
+        item = WatchlistItem(
+            user_id=user_id,
+            canonical_product_id=canonical_product_id,
+            target_price=target_price,
+        )
+        db.add(item)
+    else:
+        item.target_price = target_price
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def remove_watchlist_item(
+    db: Session,
+    *,
+    user_id: int,
+    canonical_product_id: int,
+) -> bool:
+    """Delete a user's WatchlistItem if present; returns True when deleted."""
+    item = db.scalar(
+        select(WatchlistItem).where(
+            WatchlistItem.user_id == user_id,
+            WatchlistItem.canonical_product_id == canonical_product_id,
+        )
+    )
+    if item is None:
+        return False
+    db.delete(item)
+    db.commit()
+    return True

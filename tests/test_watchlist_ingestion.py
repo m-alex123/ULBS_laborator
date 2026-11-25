@@ -124,7 +124,10 @@ def test_post_watchlist_rejects_unsupported_domain_and_drift_html(client) -> Non
 
         drift_resp = test_client.post(
             "/watchlist",
-            data={"url": f"https://www.jdsports.ro{broken_path}"},
+            data={
+                "url": f"https://www.jdsports.ro{broken_path}",
+                "csrf_token": test_client.cookies.get("p23_csrf"),
+            },
             follow_redirects=False,
         )
         assert drift_resp.status_code == 400

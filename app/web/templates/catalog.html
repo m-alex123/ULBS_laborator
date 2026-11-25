@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Catalog Public Sneakers — P23 Sneaker Price Monitor{% endblock %}
+{% block active_nav %}catalog{% endblock %}
+
+{% block ticker %}
+<div class="market-ticker-strip" aria-label="Ticker activitate magazine partenere">
+  <div class="ticker-inner">
+    {% for item in ticker_items %}
+    <div class="ticker-item">
+      <span class="ticker-label {{ item.code }}">{{ item.label }}</span>
+      <span class="ticker-stat">{{ item.count }} listări · delay &ge; {{ item.min_delay }}s ·</span>
+      {% if item.circuit_breaker_open %}
+      <span class="ticker-change down"><span aria-hidden="true">▲ </span>Circuit Breaker activ</span>
+      {% else %}
+      <span class="ticker-change up"><span aria-hidden="true">● </span>Activ</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="main-wrapper">
+  {% if not user %}
+  <section class="guest-notice-banner" aria-label="Mod Vizitator Read-Only">
+    <div>
+      <strong class="font-mono">MOD VIZITATOR (READ-ONLY):</strong>
+      Poți compara prețurile și istoricul pe cele 3 magazine fără cont. Pentru Watchlist personal și alerte,
+      <a href="/login">autentifică-te</a> sau <a href="/register">creează un cont</a>.
+    </div>
+  </section>
+  {% endif %}
+
+  {% if circuit_breakers %}
+  <section class="circuit-breaker-banner" role="alert" aria-label="Alertă Circuit Breaker">
+    <div class="cb-content">
+      <span class="cb-indicator">CIRCUIT BREAKER ACTIVAT</span>
+      <p class="cb-text">
+        Adaptorul pentru
+        {% for cb in circuit_breakers %}
+        <strong>{{ cb.domain }}</strong>{% if not loop.last %}, {% endif %}
+        {% endfor %}
+        este temporar oprit conform politicii de politețe (D-002).
+      </p>
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="action-header">
+    <div class="action-title-group">
+      <h1>Catalog Sneakers</h1>
+      <p>Comparație cross-site pe jdsports.ro, sizeer.ro și buzzsneakers.ro</p>
+    </div>
+
+    <div class="action-controls">
+      <form method="get" action="/catalog" class="search-form">
+        <input type="hidden" name="store" value="{{ store }}">
+        <input type="hidden" name="sort" value="{{ sort }}">
+        <div class="search-field">
+          <input
+            type="search"
+            name="q"
+            value="{{ q }}"
+            placeholder="Caută după model sau SKU..."
+            aria-label="Caută în catalog"
+          >
+        </div>
+        <button type="submit" class="btn-market-primary">Caută</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <div class="chips-list" role="group" aria-label="Filtrare retaileri">
+      <a href="/catalog?store=all&q={{ q | urlencode }}&sort={{ sort }}" class="chip {% if store == 'all' %}active{% endif %}" {% if store == 'all' %}aria-current="true"{% endif %}>
+        Toate ({{ total_count }})
+      </a>
+      <a href="/catalog?store=jdsports&q={{ q | urlencode }}&sort={{ sort }}" class="chip {% if store == 'jdsports' %}active{% endif %}" {% if store == 'jdsports' %}aria-current="true"{% endif %}>
+        JD Sports
+      </a>
+      <a href="/catalog?store=sizeer&q={{ q | urlencode }}&sort={{ sort }}" class="chip {% if store == 'sizeer' %}active{% endif %}" {% if store == 'sizeer' %}aria-current="true"{% endif %}>
+        Sizeer
+      </a>
+      <a href="/catalog?store=buzzsneakers&q={{ q | urlencode }}&sort={{ sort }}" class="chip {% if store == 'buzzsneakers' %}active{% endif %}" {% if store == 'buzzsneakers' %}aria-current="true"{% endif %}>
+        Buzz Sneakers
+      </a>
+    </div>
+
+    <form method="get" action="/catalog" class="sort-control">
+      <input type="hidden" name="store" value="{{ store }}">
+      <input type="hidden" name="q" value="{{ q }}">
+      <label for="sort-select">Sortare:</label>
+      <select id="sort-select" name="sort">
+        <option value="lowest_price" {% if sort == 'lowest_price' %}selected{% endif %}>Cel mai mic preț acum</option>
+        <option value="biggest_discount" {% if sort == 'biggest_discount' %}selected{% endif %}>Cea mai mare reducere %</option>
+        <option value="recent" {% if sort == 'recent' %}selected{% endif %}>Recent adăugate</option>
+      </select>
+    </form>
+  </div>
+
+  {% if cards %}
+  <section aria-labelledby="catalog-cards-heading">
+    <h2 id="catalog-cards-heading" class="sr-only">Produse disponibile în catalog</h2>
+    <div class="sneaker-grid">
+      {% for card in cards %}
+      <article class="sneaker-card">
+        <div class="card-photo-box">
+          {% if card.best_store and card.in_stock %}
+          <span class="photo-overlay-tag">CEL MAI MIC PREȚ</span>
+          {% endif %}
+          {% if card.in_stock %}
+          <span class="stock-indicator-tag"><span aria-hidden="true">● </span>ÎN STOC</span>
+          {% else %}
+          <span class="stock-indicator-tag out-of-stock"><span aria-hidden="true">● </span>EPUIZAT</span>
+          {% endif %}
+
+          {% if card.image_url %}
+          <img
+            class="sneaker-photo"
+            src="{{ card.image_url }}"
+            alt="{{ card.name }} (SKU {{ card.sku }})"
+            loading="lazy"
+            decoding="async"
+            referrerpolicy="no-referrer"
+          >
+          {% endif %}
+
+          <div class="photo-offline-fallback" {% if card.image_url %}hidden{% endif %}>
+            <svg aria-hidden="true"><use href="#icon-sneaker-offline"/></svg>
+            <span class="photo-offline-label">Imagine offline · fallback activ</span>
+            <span class="photo-offline-sku">SKU: {{ card.sku }}</span>
+          </div>
+
+          {% if card.best_store %}
+          <span class="photo-retailer-badge {{ card.best_store_code }}">OFERTĂ: {{ card.best_store_label }}</span>
+          {% endif %}
+          <span class="photo-source-badge" title="Sursă fotografie produs">{{ card.photo_source_label }}</span>
+        </div>
+
+        <div class="card-info">
+          <div class="brand-sku-row">
+            <span class="card-brand">{{ card.brand }}</span>
+            <span class="card-sku">SKU: {{ card.sku }}</span>
+          </div>
+
+          <h3 class="card-title" title="{{ card.name }}">
+            <a href="/products/{{ card.product_id }}" class="card-title-link">{{ card.name }}</a>
+          </h3>
+
+          <div class="lowest-ask-block">
+            <div class="ask-left">
+              <span class="ask-label">Cel mai mic preț</span>
+              <span class="ask-price">
+                {% if card.best_price is not none %}{{ "%.2f"|format(card.best_price) }} RON{% else %}N/A{% endif %}
+              </span>
+              {% if card.discount_percent > 0 and card.savings_ron is not none %}
+              <span class="ask-diff"><span aria-hidden="true">▼ </span>-{{ card.discount_percent }}% ({{ "%.2f"|format(card.savings_ron) }} RON)</span>
+              {% endif %}
+            </div>
+
+            <div class="sparkline-box">
+              <svg viewBox="0 0 72 28" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Evoluție preț" style="width: 100%; height: 100%;">
+                <polyline points="{{ card.sparkline.points }}" stroke="var(--color-ask-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="{{ card.sparkline.last_x }}" cy="{{ card.sparkline.last_y }}" r="2.5" fill="var(--color-ask-green)"/>
+              </svg>
+            </div>
+          </div>
+
+          <table class="retailer-table" aria-label="Comparativ magazine">
+            <tbody>
+              {% for lst in card.listings %}
+              <tr>
+                <td><span class="store-badge {{ lst.store_code }}">{{ lst.store_label }}</span></td>
+                <td class="store-price-cell {% if lst.is_lowest %}is-lowest{% endif %}">
+                  {% if not lst.in_stock %}
+                  <span style="color: var(--color-text-muted);">Indisponibil</span>
+                  {% elif lst.current_price is not none %}
+                  {{ "%.2f"|format(lst.current_price) }} RON{% if lst.is_lowest %}<span aria-hidden="true"> ★</span>{% endif %}
+                  {% else %}
+                  <span style="color: var(--color-text-muted);">N/A</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <div class="card-footer-actions">
+            <a href="/products/{{ card.product_id }}" class="btn-secondary-outline btn-sm">Comparație & Istoric</a>
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% else %}
+  <section aria-label="Catalog gol">
+    <div class="empty-exchange-box">
+      <span class="empty-header-tag">CATALOG · 0 REZULTATE</span>
+      <h2 class="empty-headline">Niciun rezultat pentru filtrele curente</h2>
+      <p class="empty-desc">Resetează căutarea pentru a vedea toate produsele disponibile în catalog.</p>
+      <a href="/catalog?sort={{ sort }}" class="btn-market-primary">Resetează filtrele</a>
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

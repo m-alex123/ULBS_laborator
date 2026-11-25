@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import (
-    create_csrf_token,
     create_session_token,
     hash_password,
     verify_password,
@@ -13,10 +12,12 @@ from app.core.security import (
 from app.db.models import User
 from app.db.session import get_db
 from app.web.deps import (
-    CSRF_COOKIE_NAME,
     get_current_user,
     is_secure_cookie_env,
     require_admin,
+    resolve_csrf_token,
+    set_csrf_cookie,
+    set_session_cookie,
     templates,
     verify_csrf_request,
 )
@@ -36,6 +37,7 @@ def _login_context(
         "email": email,
         "csrf_token": csrf_token,
         "show_demo_shortcuts": show_demo,
+        "is_auth_page": True,
     }
     if show_demo:
         ctx.update(
@@ -49,18 +51,6 @@ def _login_context(
     return ctx
 
 
-def _set_csrf_cookie(response: HTMLResponse | RedirectResponse, token: str) -> None:
-    response.set_cookie(
-        key=CSRF_COOKIE_NAME,
-        value=token,
-        max_age=settings.SESSION_MAX_AGE_SECONDS,
-        httponly=False,
-        samesite="lax",
-        secure=is_secure_cookie_env(),
-        path="/",
-    )
-
-
 @router.get("/login", response_class=HTMLResponse)
 def login_page(
     request: Request,
@@ -69,13 +59,13 @@ def login_page(
     """Render DS-01 Login screen or redirect if already authenticated."""
     if current_user:
         return RedirectResponse(url="/watchlist", status_code=303)
-    csrf_token = create_csrf_token(settings.SECRET_KEY)
+    csrf_token = resolve_csrf_token(request)
     response = templates.TemplateResponse(
         request,
         "login.html",
         _login_context(csrf_token=csrf_token),
     )
-    _set_csrf_cookie(response, csrf_token)
+    set_csrf_cookie(response, csrf_token)
     return response
 
 
@@ -96,7 +86,7 @@ def login_submit(
     password_ok = verify_password(password, candidate_hash)
 
     if not user or not password_ok:
-        fresh_csrf = create_csrf_token(settings.SECRET_KEY)
+        fresh_csrf = resolve_csrf_token(request)
         response = templates.TemplateResponse(
             request,
             "login.html",
@@ -107,7 +97,7 @@ def login_submit(
             ),
             status_code=401,
         )
-        _set_csrf_cookie(response, fresh_csrf)
+        set_csrf_cookie(response, fresh_csrf)
         return response
 
     token = create_session_token(
@@ -117,15 +107,89 @@ def login_submit(
         expires_in_seconds=settings.SESSION_MAX_AGE_SECONDS,
     )
     response = RedirectResponse(url="/watchlist", status_code=303)
-    response.set_cookie(
-        key=settings.SESSION_COOKIE_NAME,
-        value=token,
-        max_age=settings.SESSION_MAX_AGE_SECONDS,
-        httponly=True,
-        samesite="lax",
-        secure=is_secure_cookie_env(),
-        path="/",
+    set_session_cookie(response, token)
+    return response
+
+
+@router.get("/register", response_class=HTMLResponse)
+def register_page(
+    request: Request,
+    current_user: User | None = Depends(get_current_user),
+):
+    """Render user registration page or redirect if already authenticated."""
+    if current_user:
+        return RedirectResponse(url="/watchlist", status_code=303)
+    csrf_token = resolve_csrf_token(request)
+    response = templates.TemplateResponse(
+        request,
+        "register.html",
+        {"csrf_token": csrf_token, "error": None, "email": "", "is_auth_page": True},
     )
+    set_csrf_cookie(response, csrf_token)
+    return response
+
+
+@router.post("/register", response_class=HTMLResponse)
+def register_submit(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+    csrf_token: str | None = Form(default=None),
+    db: Session = Depends(get_db),
+):
+    """Register a standard user account with strong password (>=12 chars) and auto-login."""
+    verify_csrf_request(request, csrf_token)
+
+    normalized_email = email.strip().lower()
+    fresh_csrf = resolve_csrf_token(request)
+
+    def _error_response(message: str, status_code: int) -> HTMLResponse:
+        resp = templates.TemplateResponse(
+            request,
+            "register.html",
+            {
+                "csrf_token": fresh_csrf,
+                "error": message,
+                "email": email,
+                "is_auth_page": True,
+            },
+            status_code=status_code,
+        )
+        set_csrf_cookie(resp, fresh_csrf)
+        return resp
+
+    if "@" not in normalized_email or "." not in normalized_email.split("@", 1)[-1]:
+        return _error_response("Introdu o adresă de email validă.", 400)
+
+    if len(password) < 12:
+        return _error_response("Parola trebuie să conțină cel puțin 12 caractere.", 400)
+
+    try:
+        password_hash = hash_password(password)
+    except ValueError as exc:
+        return _error_response(str(exc), 400)
+
+    existing = db.scalar(select(User).where(User.email == normalized_email))
+    if existing is not None:
+        return _error_response("Există deja un cont înregistrat cu acest email.", 409)
+
+    new_user = User(
+        email=normalized_email,
+        password_hash=password_hash,
+        role="user",
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    token = create_session_token(
+        user_id=new_user.id,
+        role=new_user.role,
+        secret_key=settings.SECRET_KEY,
+        expires_in_seconds=settings.SESSION_MAX_AGE_SECONDS,
+    )
+    response = RedirectResponse(url="/watchlist", status_code=303)
+    set_session_cookie(response, token)
     return response
 
 

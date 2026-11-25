@@ -61,6 +61,7 @@ def require_admin(current_user: User | None = Depends(get_current_user)) -> User
 
 ## PATTERN-004 · Dual RobotFileParser + RFC-9309 Wildcard Enforcement & Injectable Clock/Transport
 - **Status:** candidate
+- **Confirmed:** 2026-11-25
 - **How:** Pair `urllib.robotparser.RobotFileParser` with RFC-9309 `*` and `$` wildcard rule matching (because stdlib `RobotFileParser` only performs prefix matching and misses patterns like `/cos/*` or `/*?search=`), fetch `robots.txt` fail-closed through an injectable `httpx.Client`, and inject `clock` and `sleep_fn` into rate-limiting clients so `>=10s` delays and `24h` caches are tested deterministically in milliseconds.
 - **Example:**
 ```python

@@ -62,6 +62,41 @@
     </div>
   </div>
 
+  <section class="ingest-panel" aria-label="Adaugă produs după URL">
+    <form method="post" action="/watchlist" class="ingest-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="ingest-field-url">
+        <label for="ingest-url" class="sr-only">URL produs (jdsports.ro, sizeer.ro, buzzsneakers.ro)</label>
+        <input
+          type="url"
+          id="ingest-url"
+          name="url"
+          class="text-input font-mono"
+          value="{{ submitted_url or '' }}"
+          placeholder="https://www.jdsports.ro/... sau sizeer.ro / buzzsneakers.ro"
+          required
+        >
+      </div>
+      <div class="ingest-field-target">
+        <label for="ingest-target" class="sr-only">Prag preț (RON, opțional)</label>
+        <input
+          type="text"
+          id="ingest-target"
+          name="target_price"
+          class="text-input font-mono"
+          value="{{ submitted_target or '' }}"
+          placeholder="Preț țintă RON (opțional)"
+        >
+      </div>
+      <button type="submit" class="btn-market-primary">+ Adaugă URL</button>
+    </form>
+    {% if ingest_error %}
+    <div class="auth-error-banner" role="alert" style="margin-top: var(--space-2);">
+      {{ ingest_error }}
+    </div>
+    {% endif %}
+  </section>
+
   <div class="filter-bar">
     <div class="chips-list" role="group" aria-label="Filtrare retaileri">
       <a href="/watchlist?store=all&q={{ q | urlencode }}&sort={{ sort }}" class="chip {% if store == 'all' %}active{% endif %}" {% if store == 'all' %}aria-current="true"{% endif %}>
@@ -135,7 +170,9 @@
             <span class="card-sku">SKU: {{ card.sku }}</span>
           </div>
 
-          <h3 class="card-title" title="{{ card.name }}">{{ card.name }}</h3>
+          <h3 class="card-title" title="{{ card.name }}">
+            <a href="/products/{{ card.product_id }}" class="card-title-link">{{ card.name }}</a>
+          </h3>
 
           <div class="lowest-ask-block">
             <div class="ask-left">
@@ -174,6 +211,14 @@
               {% endfor %}
             </tbody>
           </table>
+
+          <div class="card-footer-actions">
+            <a href="/products/{{ card.product_id }}" class="btn-secondary-outline btn-sm">Detalii & Istoric</a>
+            <form method="post" action="/watchlist/{{ card.product_id }}/delete" style="display: inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="logout-btn">Elimină</button>
+            </form>
+          </div>
         </div>
       </article>
       {% endfor %}
