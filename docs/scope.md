@@ -83,12 +83,12 @@ Un adaptor este marcat automat ca **suspect** (cu alertă către administrator �
 ### 4.2. Entități Principale
 1. **User:** `id`, `email`, `password_hash`, `role` (`user`, `admin`), `telegram_chat_id`, `created_at`.
 2. **CanonicalProduct:** `id`, `name`, `brand`, `sku` (cod model/producător pentru deduplicare între site-uri), `image_url`, `created_at`.
-3. **ProductListing:** `id`, `canonical_product_id`, `store` (`jdsports`, `sizeer`, `buzzsneakers`), `url`, `current_price`, `original_price` (preț tăiat), `raw_title`, `currency`, `in_stock`, `last_checked_at`, `is_active`.
-4. **PriceHistory:** `id`, `product_listing_id`, `price`, `currency`, `in_stock`, `recorded_at`, `status` (`valid`, `suspect`, `error`).
+3. **ProductListing:** `id`, `canonical_product_id`, `store` (`jdsports`, `sizeer`, `buzzsneakers`), `url`, `current_price`, `original_price` (preț tăiat), `raw_title`, `image_url`, `currency`, `in_stock`, `last_checked_at`, `is_active`.
+4. **PriceHistory:** `id`, `product_listing_id`, `price` (opțional pentru citiri cu `status="error"`), `currency`, `in_stock`, `recorded_at`, `status` (`valid`, `suspect`, `error`).
 5. **WatchlistItem / AlertRule:** `id`, `user_id`, `canonical_product_id`, `target_price`, `min_discount_percent`, `notify_stock`, `notify_email`, `notify_telegram`, `created_at`.
 6. **AdapterRunLog:** `id`, `store`, `status` (`success`, `failed`, `suspect`), `error_message`, `snapshot_path`, `duration_ms`, `created_at`.
-7. **SiteConfig:** `id`, `store`, `polling_interval_minutes` (implicit 360), `min_delay_seconds` (implicit 10), `max_requests_per_hour` (implicit 30), `circuit_breaker_open` (boolean).
-8. **NotificationLog:** `id`, `user_id`, `product_listing_id`, `channel` (`email`, `telegram`), `trigger_reason`, `message_payload`, `sent_at`.
+7. **SiteConfig:** `id`, `store`, `polling_interval_minutes` (implicit 360), `min_delay_seconds` (implicit 10), `max_requests_per_hour` (implicit 30), `circuit_breaker_open` (boolean), `updated_at`.
+8. **NotificationLog:** `id`, `user_id`, `product_listing_id` (opțional, `SET NULL` la ștergerea listării), `channel` (`email`, `telegram`), `trigger_reason`, `message_payload`, `sent_at`.
 
 ### 4.3. Stocare Fișiere și Snapshot-uri HTML
 - Fișierele HTML descărcate în caz de eșec sau citire suspectă sunt salvate pe disc în `storage/snapshots/` (cu timestamp și identificator adaptor).
