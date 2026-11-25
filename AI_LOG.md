@@ -1,4 +1,4 @@
-# AI_LOG — Jurnalul Activităților Asistate de AI (Lab 1)
+# AI_LOG — Jurnalul Activităților Asistate de AI (Lab 1 & Lab 2)
 
 Jurnal cronologic al sesiunilor de lucru asistate de AI pentru proiectul **P23 · Monitor de prețuri cu scraping etic**, desfășurate în cadrul activităților de laborator ULBS (Ingineria Programării / Tehnologii Web).
 
@@ -147,3 +147,86 @@ Jurnal cronologic al sesiunilor de lucru asistate de AI pentru proiectul **P23 �
 | Registru Ecrane (DS-01 .. DS-05) | [docs/design/registry.yaml](file:///home/manol/Work/ULBS_laborator/docs/design/registry.yaml) | Finalizat & Aprobat |
 | Machetă HTML/CSS Interactivă DS-02 | [docs/design/mocks/ds-02-watchlist.html](file:///home/manol/Work/ULBS_laborator/docs/design/mocks/ds-02-watchlist.html) | Finalizat & Aprobat |
 | Plan Pasul 1 Fundație DB | Plan aprobat conform procedurii `/plan` | Aprobat (gata de `/build` în Lab 2) |
+
+---
+
+## Sesiunea 4 (Partea F): Implementare `/build` — Pasul 1 Fundație Bază de Date (`feat/step-1-foundation`)
+
+- **Data:** 25.11.2026
+- **Obiectiv:** Executarea planului aprobat pentru Pasul 1 (Fundație) pe ramura `feat/step-1-foundation`, urmând fluxul TDD (teste scrise inițial, apoi implementarea modulelor `app/core/` și `app/db/`, a celor 8 modele ORM SQLAlchemy 2.0 și a scriptului idempotent de seed).
+
+### Ce s-a cerut (Prompt / Input)
+- Inițializarea ramurii `feat/step-1-foundation` și implementarea infrastructurii de bază conform deciziilor aprobate (`D-001`, `D-002`, `D-003`) și șabloanelor `PATTERN-001` și `PATTERN-002`:
+  - Definirea dependențelor în `requirements.txt`, configurarea `pytest.ini` și a regulilor `.gitignore`.
+  - Scrierea suitei inițiale de 13 teste automate (`tests/test_models.py`, `tests/test_security.py`, `tests/test_seed.py`) cu fixture-uri izolate în `tests/conftest.py`.
+  - Implementarea configurației aplicației (`app/core/config.py`) și a modulului de hash-uire bcrypt pentru parole (`app/core/security.py`).
+  - Implementarea stratului de date SQLAlchemy 2.0 cu `PRAGMA foreign_keys=ON` (`app/db/base.py`, `app/db/session.py`), a celor 8 modele relaționale (`User`, `CanonicalProduct`, `ProductListing`, `PriceHistory`, `WatchlistItem`, `AdapterRunLog`, `SiteConfig`, `NotificationLog`) și a scriptului idempotent de seed (`app/db/seed.py`).
+
+### Ce a produs agentul (Output)
+1. **Suită TDD inițială — commit `f6defa4` (`test(db): add 13 foundation tests for schema, security, and seed`):**
+   - [requirements.txt](file:///home/manol/Work/ULBS_laborator/requirements.txt), [pytest.ini](file:///home/manol/Work/ULBS_laborator/pytest.ini), [.gitignore](file:///home/manol/Work/ULBS_laborator/.gitignore).
+   - [tests/conftest.py](file:///home/manol/Work/ULBS_laborator/tests/conftest.py), [tests/test_models.py](file:///home/manol/Work/ULBS_laborator/tests/test_models.py), [tests/test_security.py](file:///home/manol/Work/ULBS_laborator/tests/test_security.py), [tests/test_seed.py](file:///home/manol/Work/ULBS_laborator/tests/test_seed.py) (13 teste acoperind crearea celor 8 tabele, `PRAGMA foreign_keys=ON`, constrângeri unice, ștergeri în cascadă, hash-uire/verificare bcrypt și idempotența seed-ului).
+2. **Implementarea Fundației — commit `6c698b3` (`feat(db): implement Step 1 Foundation schema, core config/security, and idempotent seed`):**
+   - Configurație și securitate: [app/core/config.py](file:///home/manol/Work/ULBS_laborator/app/core/config.py) (`Settings` bazat pe `pydantic-settings`, constante pentru *Polite Polling* și *Drift Detection* conform `D-002`) și [app/core/security.py](file:///home/manol/Work/ULBS_laborator/app/core/security.py) (`hash_password`, `verify_password` cu `bcrypt`).
+   - Sesiune și bază ORM: [app/db/base.py](file:///home/manol/Work/ULBS_laborator/app/db/base.py) (`Base`, `utcnow`) și [app/db/session.py](file:///home/manol/Work/ULBS_laborator/app/db/session.py) (`create_db_engine`, `SessionLocal`, `get_db`, `init_db` cu activare `PRAGMA foreign_keys=ON` și creare directoare `data/` și `storage/snapshots/`).
+   - Cele 8 entități ORM în [app/db/models/](file:///home/manol/Work/ULBS_laborator/app/db/models/__init__.py):
+     - [user.py](file:///home/manol/Work/ULBS_laborator/app/db/models/user.py) (`User`)
+     - [canonical_product.py](file:///home/manol/Work/ULBS_laborator/app/db/models/canonical_product.py) (`CanonicalProduct`)
+     - [product_listing.py](file:///home/manol/Work/ULBS_laborator/app/db/models/product_listing.py) (`ProductListing`)
+     - [price_history.py](file:///home/manol/Work/ULBS_laborator/app/db/models/price_history.py) (`PriceHistory`)
+     - [watchlist_item.py](file:///home/manol/Work/ULBS_laborator/app/db/models/watchlist_item.py) (`WatchlistItem`)
+     - [adapter_run_log.py](file:///home/manol/Work/ULBS_laborator/app/db/models/adapter_run_log.py) (`AdapterRunLog`)
+     - [site_config.py](file:///home/manol/Work/ULBS_laborator/app/db/models/site_config.py) (`SiteConfig`)
+     - [notification_log.py](file:///home/manol/Work/ULBS_laborator/app/db/models/notification_log.py) (`NotificationLog`)
+   - Script de seed idempotent: [app/db/seed.py](file:///home/manol/Work/ULBS_laborator/app/db/seed.py) populând cele 3 configurații de magazin (`jdsports`, `sizeer`, `buzzsneakers`), cele 2 conturi demonstrative (`admin@pricemonitor.local`, `user@pricemonitor.local`), 3 produse canonice cu *SKU* (`553558-403`, `HQ8708`, `DZ5485-612`), 9 listări, 45 puncte de istoric de prețuri, elementele de *Watchlist* și log-urile inițiale ale adaptoarelor.
+   - Directoare locale păstrate prin `.gitkeep`: `data/.gitkeep` și `storage/snapshots/.gitkeep`.
+
+---
+
+## Sesiunea 5 (Partea G): Revizuire Multi-Specialist (Code Review), Corecții și Merge în `main`
+
+- **Data:** 25.11.2026
+- **Obiectiv:** Efectuarea unei revizuiri de cod din 3 perspective de specialitate (Securitate & Configurare, Arhitectură DB & Integritate Date, Calitate Cod & Testare), aplicarea corecțiilor identificate pe `feat/step-1-foundation`, validarea completă a testelor și integrarea curată în `main`.
+
+### Ce s-a cerut (Prompt / Input)
+- Auditarea riguroasă a tuturor fișierelor implementate în Pasul 1 și remedierea problemelor de securitate, precizie a datelor, constrângeri SQLite și acoperire de teste.
+- Verificarea cu `.venv/bin/pytest -v`, comiterea modificărilor pe `feat/step-1-foundation`, integrarea curată (*merge*) în ramura `main`, actualizarea `AI_LOG.md` și validarea registrului cu `python3 docs/agents/tools/ledger-lint.py`.
+
+### Ce a produs agentul (Output)
+1. **Corecții aplicate în urma revizuirii de cod (21 fișiere — commit `988969b`):**
+   - **Securitate și Configurare:**
+     - [app/core/config.py](file:///home/manol/Work/ULBS_laborator/app/core/config.py): încărcare `.env` relativă la `PROJECT_ROOT`, adăugare `ENVIRONMENT`, validări Pydantic `Field` pentru limitele `D-002` (`DEFAULT_POLLING_INTERVAL_MINUTES > 0`, `DEFAULT_MIN_DELAY_SECONDS >= 10`, `1 <= DEFAULT_MAX_REQUESTS_PER_HOUR <= 30`, `ROBOTS_CACHE_TTL_HOURS >= 1`) și `validate_production_secret` care interzice pornirea în `production` cu cheia implicită de dezvoltare.
+     - [app/core/security.py](file:///home/manol/Work/ULBS_laborator/app/core/security.py): respingerea parolelor goale sau formate exclusiv din spații albe, aplicarea explicită a limitei `MAX_BCRYPT_BYTES = 72` octeți UTF-8 atât în `hash_password`, cât și în `verify_password`, cu tratarea sigură a tipurilor invalide.
+     - [.env.example](file:///home/manol/Work/ULBS_laborator/.env.example) (nou) și extinderea [.gitignore](file:///home/manol/Work/ULBS_laborator/.gitignore) (`.env.*`, `!.env.example`, `data/*.sqlite*`).
+     - [requirements.txt](file:///home/manol/Work/ULBS_laborator/requirements.txt): stabilirea limitelor superioare de versiune majoră pentru toate cele 10 pachete.
+   - **Integritate Bază de Date, Tipuri și Constrângeri:**
+     - [app/db/base.py](file:///home/manol/Work/ULBS_laborator/app/db/base.py): introducerea tipului `UTCDateTime` (`TypeDecorator`) pentru garantarea valorilor `datetime` timezone-aware în UTC la citirea din SQLite.
+     - [app/db/session.py](file:///home/manol/Work/ULBS_laborator/app/db/session.py): înregistrarea listener-ului `_set_sqlite_pragma` per engine SQLite creat în `create_db_engine` și parametrizarea `create_snapshots_dir` în `init_db`.
+     - Înlocuirea tipului `Float` cu `Numeric(10, 2)` (`Decimal`) pentru câmpurile monetare și procentuale în `ProductListing`, `PriceHistory` (`price` devenit nullable pentru înregistrările cu `status="error"`) și `WatchlistItem`.
+     - Adăugarea constrângerilor `CheckConstraint` pentru enum-uri (`User.role`, `ProductListing.store`, `PriceHistory.status`, `AdapterRunLog.store`, `AdapterRunLog.status`, `SiteConfig.store`, `NotificationLog.channel`) și limitele de politețe în `SiteConfig` (`polling_interval_minutes > 0`, `min_delay_seconds >= 10`, `1 <= max_requests_per_hour <= 30`).
+     - Adăugarea `UniqueConstraint("canonical_product_id", "store", name="uq_listing_product_store")` și a câmpului `image_url` pe `ProductListing`; configurarea `ondelete="SET NULL"` pentru `NotificationLog.product_listing_id` (păstrarea istoricului de notificări la ștergerea unei listări); optimizarea indecșilor compoziți și eliminarea indecșilor redundanți; folosirea `lambda:` pentru valorile implicite ale `SiteConfig`.
+     - Sincronizarea documentației în [docs/scope.md](file:///home/manol/Work/ULBS_laborator/docs/scope.md) (secțiunea 4.2).
+   - **Idempotență Seed și Extindere Teste:**
+     - [app/db/seed.py](file:///home/manol/Work/ULBS_laborator/app/db/seed.py): migrarea valorilor la `Decimal`, utilizarea interogărilor `session.scalar(select(...))`, completarea idempotentă pe fiecare magazin în `seed_adapter_run_logs` și documentarea fallback-ului UI pentru imaginile per retailer.
+     - Extinderea suitei de teste de la 13 la **24 teste automate** ([tests/conftest.py](file:///home/manol/Work/ULBS_laborator/tests/conftest.py), [tests/test_models.py](file:///home/manol/Work/ULBS_laborator/tests/test_models.py), [tests/test_security.py](file:///home/manol/Work/ULBS_laborator/tests/test_security.py), [tests/test_seed.py](file:///home/manol/Work/ULBS_laborator/tests/test_seed.py)), verificând `UTCDateTime`, precizia `Decimal`, unicitatea `(canonical_product_id, store)`, `CheckConstraint`-urile, `SET NULL` pe `NotificationLog`, limita de 72 octeți UTF-8 în `bcrypt`, limitele `D-002` în `Settings`, idempotența pe 3 rulări și rularea CLI `seed_module.main()`.
+2. **Integrare în `main` și Verificări Finale:**
+   - Execuția `.venv/bin/pytest -v`: **24 passed** (100% din teste trecute).
+   - Merge curat al ramurii `feat/step-1-foundation` în `main` (`Merge branch 'feat/step-1-foundation' into main`).
+   - Verificarea integrității registrului cu `python3 docs/agents/tools/ledger-lint.py`: **`✓ ledger ok`**.
+
+### Ce a verificat și aprobat utilizatorul
+- A rulat și confirmat trecerea tuturor celor 24 de teste automate după aplicarea corecțiilor din revizuirea multi-specialist.
+- A solicitat comiterea modificărilor rămase pe `feat/step-1-foundation`, integrarea curată (*merge*) în `main`, actualizarea `AI_LOG.md` și confirmarea `ledger-lint.py`.
+
+---
+
+## Rezumatul Livrabilelor Pasului 1 (Lab 2 — Fundație)
+
+| Livrabil | Cale / Fișier | Stare |
+|---|---|---|
+| Configurație, Securitate & Template Mediu | [app/core/config.py](file:///home/manol/Work/ULBS_laborator/app/core/config.py), [app/core/security.py](file:///home/manol/Work/ULBS_laborator/app/core/security.py), [.env.example](file:///home/manol/Work/ULBS_laborator/.env.example) | Finalizat & Integrat în `main` |
+| Sesiune SQLite & Bază ORM | [app/db/base.py](file:///home/manol/Work/ULBS_laborator/app/db/base.py), [app/db/session.py](file:///home/manol/Work/ULBS_laborator/app/db/session.py) | Finalizat & Integrat în `main` |
+| Modele ORM SQLAlchemy 2.0 (8 entități) | [app/db/models/](file:///home/manol/Work/ULBS_laborator/app/db/models/__init__.py) | Finalizat & Integrat în `main` |
+| Script Idempotent de Seed | [app/db/seed.py](file:///home/manol/Work/ULBS_laborator/app/db/seed.py) | Finalizat & Integrat în `main` |
+| Suită Teste Automate (24 teste) | [tests/test_models.py](file:///home/manol/Work/ULBS_laborator/tests/test_models.py), [tests/test_security.py](file:///home/manol/Work/ULBS_laborator/tests/test_security.py), [tests/test_seed.py](file:///home/manol/Work/ULBS_laborator/tests/test_seed.py) | 24/24 Passed |
+| Jurnal AI Actualizat (Partea F & Partea G) | [AI_LOG.md](file:///home/manol/Work/ULBS_laborator/AI_LOG.md) | Actualizat & Verificat |
