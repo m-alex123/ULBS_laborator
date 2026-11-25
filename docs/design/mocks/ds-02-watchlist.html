@@ -759,19 +759,22 @@
       color: var(--color-text-muted);
     }
 
-    /* 2-line title clamping with strict min-height for uniform grid */
+    /* 2-line title clamping with exact 2-line height to prevent line-3 pixel bleed */
     .card-title {
       font-size: var(--text-sm);
       font-weight: var(--font-bold);
       color: var(--color-text-primary);
       letter-spacing: var(--tracking-tight);
-      line-height: 1.3;
+      line-height: 1.25rem;
       display: -webkit-box;
       -webkit-line-clamp: 2;
+      line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
       text-overflow: ellipsis;
-      min-height: 2.6rem;
+      min-height: 2.5rem;
+      max-height: 2.5rem;
+      flex-shrink: 0;
     }
 
     /* P23 Lowest Price Metric Block */
