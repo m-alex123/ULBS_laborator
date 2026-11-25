@@ -1,10 +1,11 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from decimal import Decimal
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Numeric, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, utcnow
+from app.db.base import Base, UTCDateTime, utcnow
 
 if TYPE_CHECKING:
     from app.db.models.canonical_product import CanonicalProduct
@@ -23,20 +24,21 @@ class WatchlistItem(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
     )
     canonical_product_id: Mapped[int] = mapped_column(
         ForeignKey("canonical_products.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    target_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    min_discount_percent: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    target_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    min_discount_percent: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 2), nullable=True
+    )
     notify_stock: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     notify_email: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     notify_telegram: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, nullable=False
+        UTCDateTime(), default=utcnow, nullable=False
     )
 
     user: Mapped["User"] = relationship(back_populates="watchlist_items")

@@ -14,8 +14,11 @@ venv/
 
 # Local config, database, and snapshots
 .env
+.env.*
+!.env.example
 data/*.db
 data/*.db-*
+data/*.sqlite*
 storage/snapshots/*
 !data/.gitkeep
 !storage/snapshots/.gitkeep

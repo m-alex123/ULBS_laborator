@@ -4,8 +4,15 @@ import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
 import app.db.models  # noqa: F401
+from app.core.config import settings
 from app.db.base import Base
 from app.db.session import create_db_engine
+
+
+@pytest.fixture(autouse=True)
+def isolate_snapshots_dir(tmp_path, monkeypatch) -> None:
+    """Keep tests from touching the workspace storage/snapshots directory."""
+    monkeypatch.setattr(settings, "SNAPSHOTS_DIR", tmp_path / "snapshots")
 
 
 @pytest.fixture()

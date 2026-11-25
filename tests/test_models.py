@@ -1,10 +1,13 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import pytest
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.db.base import utcnow
 from app.db.models import (
     AdapterRunLog,
     CanonicalProduct,
@@ -18,7 +21,8 @@ from app.db.models import (
 from app.db.session import create_db_engine, init_db
 
 
-def test_init_db_creates_all_eight_tables(tmp_path) -> None:
+def test_init_db_creates_all_eight_tables(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "SNAPSHOTS_DIR", tmp_path / "snapshots")
     db_file = tmp_path / "schema_check.db"
     engine = create_db_engine(f"sqlite:///{db_file}")
     try:
@@ -250,3 +254,144 @@ def test_site_config_and_adapter_run_log_defaults(db_session: Session) -> None:
     assert cfg.circuit_breaker_open is False
     assert run_log.status == "suspect"
     assert run_log.snapshot_path == "storage/snapshots/buzzsneakers_20261125.html"
+
+
+def test_utc_datetime_roundtrip_preserves_timezone_awareness(db_session: Session) -> None:
+    cfg = SiteConfig(store="jdsports")
+    db_session.add(cfg)
+    db_session.commit()
+    db_session.expire_all()
+
+    loaded = db_session.get(SiteConfig, cfg.id)
+    assert loaded is not None
+    assert loaded.updated_at.tzinfo == timezone.utc
+    delta = utcnow() - loaded.updated_at
+    assert delta.total_seconds() >= 0
+
+
+def test_numeric_precision_and_nullable_price_history_error(db_session: Session) -> None:
+    product = CanonicalProduct(name="Nike Dunk Low Retro", brand="Nike", sku="DD1391-101")
+    db_session.add(product)
+    db_session.flush()
+
+    listing = ProductListing(
+        canonical_product_id=product.id,
+        store="jdsports",
+        url="https://www.jdsports.ro/nike-dunk-low-dd1391-101",
+        current_price=Decimal("489.99"),
+        original_price=Decimal("599.99"),
+        raw_title="Nike Dunk Low Retro",
+    )
+    db_session.add(listing)
+    db_session.flush()
+
+    error_entry = PriceHistory(
+        product_listing_id=listing.id,
+        price=None,
+        currency="RON",
+        in_stock=False,
+        status="error",
+    )
+    db_session.add(error_entry)
+    db_session.commit()
+    db_session.expire_all()
+
+    loaded_listing = db_session.get(ProductListing, listing.id)
+    loaded_history = db_session.get(PriceHistory, error_entry.id)
+    assert loaded_listing is not None and loaded_listing.current_price == Decimal("489.99")
+    assert isinstance(loaded_listing.current_price, Decimal)
+    assert loaded_history is not None and loaded_history.price is None
+    assert loaded_history.status == "error"
+
+
+def test_unique_listing_per_canonical_product_and_store(db_session: Session) -> None:
+    product = CanonicalProduct(name="Adidas Gazelle", brand="Adidas", sku="BB5476")
+    db_session.add(product)
+    db_session.flush()
+
+    db_session.add(
+        ProductListing(
+            canonical_product_id=product.id,
+            store="sizeer",
+            url="https://sizeer.ro/adidas-gazelle-bb5476-v1",
+            current_price=Decimal("499.99"),
+            raw_title="Adidas Gazelle",
+        )
+    )
+    db_session.commit()
+
+    db_session.add(
+        ProductListing(
+            canonical_product_id=product.id,
+            store="sizeer",
+            url="https://sizeer.ro/adidas-gazelle-bb5476-v2",
+            current_price=Decimal("489.99"),
+            raw_title="Adidas Gazelle Duplicate Store",
+        )
+    )
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+
+def test_check_constraints_reject_invalid_enums_and_politeness_bounds(
+    db_session: Session,
+) -> None:
+    invalid_records = [
+        User(email="badrole@pricemonitor.local", password_hash="hash", role="superadmin"),
+        SiteConfig(store="zara"),
+        SiteConfig(store="jdsports", min_delay_seconds=5),
+        SiteConfig(store="sizeer", max_requests_per_hour=60),
+        SiteConfig(store="buzzsneakers", polling_interval_minutes=0),
+        AdapterRunLog(store="jdsports", status="unknown"),
+    ]
+    for record in invalid_records:
+        db_session.add(record)
+        with pytest.raises(IntegrityError):
+            db_session.commit()
+        db_session.rollback()
+
+
+def test_cascade_delete_product_listing_removes_history_and_nulls_notification_log(
+    db_session: Session,
+) -> None:
+    user = User(email="notif_keep@pricemonitor.local", password_hash="hash", role="user")
+    product = CanonicalProduct(name="ASICS Gel-1130", brand="ASICS", sku="1201A256-113")
+    db_session.add_all([user, product])
+    db_session.flush()
+
+    listing = ProductListing(
+        canonical_product_id=product.id,
+        store="buzzsneakers",
+        url="https://www.buzzsneakers.ro/asics-gel-1130",
+        current_price=Decimal("499.99"),
+        raw_title="ASICS Gel-1130",
+    )
+    db_session.add(listing)
+    db_session.flush()
+
+    history = PriceHistory(
+        product_listing_id=listing.id,
+        price=Decimal("499.99"),
+        status="valid",
+    )
+    notif = NotificationLog(
+        user_id=user.id,
+        product_listing_id=listing.id,
+        channel="telegram",
+        trigger_reason="back_in_stock",
+        message_payload="Produsul a revenit in stoc!",
+    )
+    db_session.add_all([history, notif])
+    db_session.commit()
+    notif_id = notif.id
+
+    db_session.delete(listing)
+    db_session.commit()
+    db_session.expire_all()
+
+    assert db_session.query(PriceHistory).count() == 0
+    preserved_notif = db_session.get(NotificationLog, notif_id)
+    assert preserved_notif is not None
+    assert preserved_notif.product_listing_id is None
+    assert preserved_notif.message_payload == "Produsul a revenit in stoc!"
