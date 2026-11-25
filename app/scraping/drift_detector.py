@@ -69,6 +69,8 @@ def check_plausibility(
         reasons.append("missing_price")
     if not scraped.currency:
         reasons.append("missing_currency")
+    elif scraped.currency.strip().upper() != "RON":
+        reasons.append(f"unexpected_currency_{scraped.currency.strip().upper()}")
     if scraped.in_stock is None:
         reasons.append("missing_stock_status")
 

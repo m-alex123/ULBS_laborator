@@ -197,11 +197,14 @@ class PoliteHttpClient:
 
     def is_allowed_by_robots(self, url: str) -> bool:
         """Return True iff cached/fetched robots.txt permits fetching url."""
+        parsed = urlparse(url)
+        if parsed.scheme.lower() not in ("http", "https") or not parsed.netloc:
+            return False
+
         entry = self._get_robots_entry(url)
         if not entry.allowed_base:
             return False
 
-        parsed = urlparse(url)
         path_and_query = parsed.path or "/"
         if parsed.query:
             path_and_query = f"{path_and_query}?{parsed.query}"
@@ -257,16 +260,15 @@ class PoliteHttpClient:
             elapsed = now - last_ts
             if elapsed < effective_delay:
                 self._sleep(effective_delay - elapsed)
-                now = self._clock()
+
+        req_now = self._clock()
+        self._last_request_at[domain] = req_now
+        history.append(req_now)
 
         try:
             response = self._client.get(url, headers={"User-Agent": self.user_agent})
         except httpx.HTTPError as exc:
             raise UpstreamFetchError(f"HTTP transport error for {url}: {exc}") from exc
-
-        recorded_now = self._clock()
-        self._last_request_at[domain] = recorded_now
-        history.append(recorded_now)
 
         if response.status_code >= 400:
             raise UpstreamFetchError(

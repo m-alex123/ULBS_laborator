@@ -19,19 +19,20 @@
 - [x] SSR `DS-01` Login and `DS-02` Live Watchlist (`GET /`, `GET /watchlist`) with search, store chips, sort, CB banner, and empty state
 - [x] `API.md`, `CONTRACTS.md` (`C-001`..`C-003`), `TODO.md`, and updated `README.md`
 
-## Phase 3 · Ethical Scraping Adapters & Polite Polling (Step 3)
-- [ ] `robots.txt` fetcher & 24h local cache using `urllib.robotparser` (`app/scrapers/robots.py`)
-- [ ] Per-domain rate limiter (`delay >= 10s`, `<= 30 req/hour`) & transparent `User-Agent` HTTP client (`app/scrapers/client.py`)
-- [ ] Store adapters with HTML fixtures & pytest suites:
-  - [ ] `jdsports.ro` adapter (`app/scrapers/jdsports.py`)
-  - [ ] `sizeer.ro` adapter (`app/scrapers/sizeer.py`)
-  - [ ] `buzzsneakers.ro` adapter (`app/scrapers/buzzsneakers.py`)
-- [ ] `POST /watchlist` URL ingestion & SKU deduplication workflow
+## Phase 3 · Ethical Scraping Adapters, Drift Detection & SKU Deduplication (Step 3)
+- [x] Pure Romanian price & availability parser (`app/scraping/price_parser.py`) + 26 unit tests
+- [x] `robots.txt` fetcher & 24h local cache using `urllib.robotparser` + RFC-9309 wildcards, per-domain rate limiter (`delay >= 10s`, `<= 30 req/hour`), & transparent `User-Agent` HTTP client (`app/scraping/polite_client.py`)
+- [x] Store adapters with offline HTML fixtures & pytest suites:
+  - [x] `jdsports.ro` adapter (`app/scraping/adapters/jdsports.py`)
+  - [x] `sizeer.ro` adapter (`app/scraping/adapters/sizeer.py`)
+  - [x] `buzzsneakers.ro` adapter (`app/scraping/adapters/buzzsneakers.py`)
+- [x] P23 Drift detection engine (`>70%` drop, `>200%` rise, `<50 RON`, title similarity `<60%`, missing fields) & HTML snapshot persistence in `storage/snapshots/` (`app/scraping/drift_detector.py`)
+- [x] Cross-site SKU normalization & fuzzy deduplication engine with uncertain-match admin flag (`app/scraping/deduplicator.py`)
+- [ ] `POST /watchlist` URL ingestion web route wiring
 
-## Phase 4 · Drift Detection, Snapshots & Admin Dashboard (Step 4)
-- [ ] Drift detection engine (`>70%` drop, `>200%` rise, `<50 RON`, title similarity `<60%`, missing fields)
-- [ ] Circuit breaker state transitions & HTML snapshot persistence in `storage/snapshots/`
-- [ ] `DS-05` Admin Health Dashboard (`/admin`) with snapshot viewer, manual rescan trigger, and polling config editor
+## Phase 4 · Scheduled Worker, Circuit Breaker & Admin Dashboard (Step 4)
+- [ ] Scheduled polling worker loop (`app/worker/`) & automatic circuit breaker state transitions
+- [ ] `DS-05` Admin Health Dashboard (`/admin`) with snapshot viewer, uncertain-match review confirmation, manual rescan trigger, and polling config editor
 
 ## Phase 5 · Product Detail, Settings & Alerts (Step 5)
 - [ ] `DS-03` Product Detail & Chart.js price history (`/products/{sku}`)
