@@ -27,6 +27,7 @@ class CanonicalProduct(Base):
 
     listings: Mapped[list["ProductListing"]] = relationship(
         back_populates="canonical_product",
+        foreign_keys="[ProductListing.canonical_product_id]",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )

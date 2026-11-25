@@ -9,6 +9,7 @@
 - PATTERN-001 · SQLite Foreign Keys Enforcement & SQLAlchemy 2.0 Typed Declarative Models · candidate
 - PATTERN-002 · Idempotent Database Seeding · candidate
 - PATTERN-003 · HMAC-SHA256 Signed HttpOnly Session Cookies & Server-Side Role Guards · candidate
+- PATTERN-004 · Dual RobotFileParser + RFC-9309 Wildcard Enforcement & Injectable Clock/Transport · candidate
 
 ---
 
@@ -56,4 +57,16 @@ def require_admin(current_user: User | None = Depends(get_current_user)) -> User
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")
     return current_user
+```
+
+## PATTERN-004 · Dual RobotFileParser + RFC-9309 Wildcard Enforcement & Injectable Clock/Transport
+- **Status:** candidate
+- **How:** Pair `urllib.robotparser.RobotFileParser` with RFC-9309 `*` and `$` wildcard rule matching (because stdlib `RobotFileParser` only performs prefix matching and misses patterns like `/cos/*` or `/*?search=`), fetch `robots.txt` fail-closed through an injectable `httpx.Client`, and inject `clock` and `sleep_fn` into rate-limiting clients so `>=10s` delays and `24h` caches are tested deterministically in milliseconds.
+- **Example:**
+```python
+client = PoliteHttpClient(
+    http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    clock=fake_clock.time,
+    sleep_fn=fake_clock.sleep,
+)
 ```

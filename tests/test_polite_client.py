@@ -27,6 +27,7 @@ class FakeClock:
 JDSPORTS_ROBOTS = """User-agent: *
 Disallow: /search
 Disallow: /aisearch*
+Disallow: /cos$
 Disallow: /cos/*
 Disallow: /login
 Disallow: /profil
