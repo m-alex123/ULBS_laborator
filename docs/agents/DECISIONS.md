@@ -10,15 +10,16 @@
 - D-001 · Stiva tehnologică pentru proiectul P23
 - D-002 · Politica de scraping etic și pragurile de detecție a derivei (drift detection)
 - D-003 · Stocarea locală a datelor, snapshot-urile HTML și modelul de autentificare
+- D-004 · Contracte HTTP și Arhitectură Web SSR (Step 2)
 
 ---
 
 ## D-001 · Stiva tehnologică pentru proiectul P23
 - **Status:** approved
-- **Confirmed:** 2026-11-19
-- **Rule:** Aplicația se dezvoltă în Python 3 utilizând FastAPI (cu șabloane Jinja2, Tailwind CSS și Chart.js), httpx și BeautifulSoup4 pentru scraping etic (cu `urllib.robotparser`), SQLite (`data/pricemonitor.db`) pentru stocarea datelor și pytest pentru teste automate.
-- **Why:** Oferă simplitate, portabilitate maximă, pornire rapidă fără servicii externe la evaluare și unelte native excelente pentru scraping etic și parsare HTML.
-- **Evidence:** Confirmat de utilizator în data de 19.11.2026 în urma soluționării Q-001 și documentat în [docs/scope.md](file:///home/manol/Work/ULBS_laborator/docs/scope.md).
+- **Confirmed:** 2026-11-25
+- **Rule:** Aplicația se dezvoltă în Python 3 utilizând FastAPI (cu șabloane Jinja2, CSS bazat pe token-urile `docs/design/DESIGN.md` / Tailwind și Chart.js), httpx și BeautifulSoup4 pentru scraping etic (cu `urllib.robotparser`), SQLite (`data/pricemonitor.db`) pentru dezvoltare locală și teste `pytest`, respectiv PostgreSQL 16 (`psycopg`) în mediul Docker Compose / producție via `DATABASE_URL`, și pytest pentru teste automate.
+- **Why:** Oferă simplitate, portabilitate maximă la dezvoltare/testare fără dependențe grele și persistență robustă cu PostgreSQL 16 în rularea containerizată și producție.
+- **Evidence:** Confirmat inițial la 19.11.2026 ([docs/scope.md](file:///home/manol/Work/ULBS_laborator/docs/scope.md)) și actualizat la 25.11.2026 pentru suportul dual SQLite + PostgreSQL 16 ([docker-compose.yml](file:///home/manol/Work/ULBS_laborator/docker-compose.yml), [app/db/session.py](file:///home/manol/Work/ULBS_laborator/app/db/session.py)).
 
 ## D-002 · Politica de scraping etic și pragurile de detecție a derivei (drift detection)
 - **Status:** approved
@@ -29,7 +30,14 @@
 
 ## D-003 · Stocarea locală a datelor, snapshot-urile HTML și modelul de autentificare
 - **Status:** approved
-- **Confirmed:** 2026-11-19
-- **Rule:** Datele aplicației sunt persistate local într-o bază de date SQLite (`data/pricemonitor.db`), iar snapshot-urile HTML descărcate în caz de eșec sau citiri suspecte de derivă sunt salvate pe disc în directorul `storage/snapshots/` (ignorat în Git, reținând în baza de date doar calea relativă). Autentificarea utilizatorilor se bazează pe email și parolă hash-uită (cu rolurile `user` și `admin`), iar scriptul de seed populează la inițializare două conturi demonstrative: administrator (`admin@pricemonitor.local`) și utilizator demo (`user@pricemonitor.local`) cu produse și istoric de prețuri preîncărcate.
-- **Why:** Oferă portabilitate maximă și pornire instantanee la evaluare fără servicii externe sau containere de baze de date, separă stocarea fișierelor HTML voluminoase de baza relațională și pune la dispoziție conturi gata configurate pentru verificarea imediată a funcționalităților.
-- **Evidence:** Confirmat și aprobat conform [docs/scope.md](file:///home/manol/Work/ULBS_laborator/docs/scope.md) (secțiunile 3.3, 4.1, 4.2 și 4.3).
+- **Confirmed:** 2026-11-25
+- **Rule:** Datele aplicației sunt persistate prin SQLAlchemy 2.0 în SQLite (`data/pricemonitor.db`) local/în teste și în PostgreSQL 16 (`DATABASE_URL=postgresql+psycopg://...`) în Docker/producție, iar snapshot-urile HTML descărcate în caz de eșec sau citiri suspecte de derivă sunt salvate pe disc în directorul `storage/snapshots/` (ignorat în Git, reținând în baza de date doar calea relativă). Autentificarea utilizatorilor verifică email-ul și parola hash-uită cu `bcrypt` și emite cookie-uri `HttpOnly` (`SameSite=Lax`) semnate HMAC-SHA256 cu aplicarea rolurilor (`user` și `admin`) pe server, iar scriptul de seed populează idempotent două conturi demonstrative (`admin@pricemonitor.local` și `user@pricemonitor.local`) cu produse și istoric de prețuri preîncărcate.
+- **Why:** Păstrează portabilitatea SQLite pentru testare și dezvoltare rapidă, oferă fiabilitate PostgreSQL 16 în container/producție și elimină expunerea token-urilor de sesiune în JavaScript prin cookie-uri semnate `HttpOnly`.
+- **Evidence:** Confirmat la 19.11.2026 ([docs/scope.md](file:///home/manol/Work/ULBS_laborator/docs/scope.md)) și actualizat la 25.11.2026 ([app/core/security.py](file:///home/manol/Work/ULBS_laborator/app/core/security.py), [app/web/deps.py](file:///home/manol/Work/ULBS_laborator/app/web/deps.py), [app/web/routers/auth.py](file:///home/manol/Work/ULBS_laborator/app/web/routers/auth.py)).
+
+## D-004 · Contracte HTTP și Arhitectură Web SSR (Step 2)
+- **Status:** approved
+- **Confirmed:** 2026-11-25
+- **Rule:** Aplicația web FastAPI (`app/main.py`) expune rute server-side Jinja2 (`DS-01` `/login`, `DS-02` `/` și `/watchlist`), endpoint-ul de monitorizare `GET /health` și verificarea de rol `GET /admin/status`, aplicând controlul accesului pe roluri (`user` / `admin`) pe server prin cookie-uri semnate `HttpOnly`; stilizarea utilizează CSS pur (`app/web/static/css/p23.css`) derivat direct din token-urile `docs/design/DESIGN.md` fără pipeline Node de build.
+- **Why:** Asigură o limită clară de contract pentru Checkpoint Step 2 și menține containerul Docker Python minimal și rapid la pornire (`python -m app.db.seed && uvicorn ... --port ${PORT:-8000}`).
+- **Evidence:** Aprobat de utilizator la 25.11.2026 și implementat în [app/main.py](file:///home/manol/Work/ULBS_laborator/app/main.py), [API.md](file:///home/manol/Work/ULBS_laborator/API.md) și [docs/agents/CONTRACTS.md](file:///home/manol/Work/ULBS_laborator/docs/agents/CONTRACTS.md).

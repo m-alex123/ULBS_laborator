@@ -10,25 +10,33 @@ Proiectul P23: Monitor de prețuri cu scraping etic pentru încălțăminte spor
 
 ```text
 [Repository Root]
-  ├── docs/             (Cerințe, brief, scope, decizii, întrebări, patterns)
-  ├── app/              (Cod sursă aplicație: web, scraping, worker, modele, alerte)
-  │     ├── scrapers/   (Adaptoare per site: jdsports, sizeer, buzzsneakers)
-  │     ├── worker/     (Scheduler, coadă job-uri, circuit breaker, drift detection)
-  │     └── web/        (Rute FastAPI, șabloane Jinja2, static CSS/JS)
-  ├── data/             (Bază de date SQLite: pricemonitor.db)
-  ├── storage/          (Snapshot-uri HTML salvate la erori/derivă)
-  └── tests/            (Teste unitare și de integrare pytest pe fixtures HTML)
+  ├── .github/workflows/ci.yml  (CI pytest + ledger-lint)
+  ├── Dockerfile                (Container web Python 3.12 + seed + uvicorn)
+  ├── docker-compose.yml        (PostgreSQL 16 + FastAPI web pe port 8000)
+  ├── docs/                     (Cerințe, scope, decizii, contracte, design tokens)
+  ├── app/                      (Cod sursă aplicație)
+  │     ├── main.py             (Entrypoint FastAPI, lifespan, static, routere)
+  │     ├── core/               (Configurare Pydantic Settings & securitate bcrypt/HMAC)
+  │     ├── db/                 (Session SQLite/PostgreSQL, modele ORM, seed idempotent)
+  │     ├── services/           (Servicii domeniu, ex. watchlist_service.py)
+  │     ├── web/                (Routere health/auth/watchlist, deps, Jinja2, static CSS/JS)
+  │     ├── scrapers/           (Step 3: adaptoare jdsports, sizeer, buzzsneakers)
+  │     └── worker/             (Step 3-4: scheduler, circuit breaker, drift detection)
+  ├── data/                     (Bază de date locală SQLite: pricemonitor.db)
+  ├── storage/snapshots/        (Snapshot-uri HTML salvate la erori/derivă)
+  └── tests/                    (Teste unitare și integrare pytest)
 ```
 
 ## Parts
 | Part | Path | Responsibility | Talks to |
 |---|---|---|---|
-| Documentation | docs/, docs/agents | Guvernanță, specificații, decizii tehnice și etice | Dezvoltatori, Evaluatori |
-| Web Application | app/web | Interfață grafică utilizator & panou admin (FastAPI + Jinja2 + Chart.js) | Utilizatori, Administrator |
-| Scraping Adapters | app/scrapers | Extragere date, politețe (delay $\ge$10s, rate limits), validare `robots.txt` | Magazine online |
-| Worker & Scheduler | app/worker | Rulare automată la 6 ore, detecție derivă, snapshots la eroare | Bază de date, Storage |
-| Database & Models | app/db, data/ | Modele de date, persistență SQLite, deduplicare SKU | Web App, Worker |
-| Notifications | app/services | Trimitere alerte către utilizatori/admin (Email, Telegram) | Servicii externe alerte |
+| Documentation & Contracts | docs/, API.md, README.md, TODO.md | Guvernanță, specificații, decizii, contracte HTTP | Dezvoltatori, Evaluatori |
+| Web Application | app/main.py, app/web/ | Rute FastAPI (`/health`, `/login`, `/watchlist`), sesiuni `HttpOnly`, șabloane Jinja2 | Utilizatori, Administrator |
+| Domain Services | app/services/ | Agregare watchlist, calcul cel mai mic preț, sparkline, filtrare/sortare | Web App, Database |
+| Security & Config | app/core/ | Setări mediu (`pydantic-settings`), hashing `bcrypt`, cookie-uri semnate HMAC-SHA256 | Web App, Database |
+| Database & Models | app/db/, data/ | Modele SQLAlchemy 2.0, engine dual SQLite / PostgreSQL 16, seed idempotent | Web App, Services |
+| Scraping Adapters (planned) | app/scrapers/ | Extragere date, politețe (delay $\ge$10s, rate limits), validare `robots.txt` | Magazine online |
+| Worker & Scheduler (planned) | app/worker/ | Rulare automată la 6 ore, detecție derivă, snapshots la eroare | Bază de date, Storage |
 
 ## Data flow
 1. Utilizatorul adaugă un URL de produs în aplicație și configurează praguri de alertă.
@@ -40,21 +48,24 @@ Proiectul P23: Monitor de prețuri cu scraping etic pentru încălțăminte spor
 ## State and storage
 | What | Where | Owner | Notes |
 |---|---|---|---|
-| Source code & docs | Git repository | Autor / Student | Tracked in main branch |
-| Application DB | data/pricemonitor.db | SQLite | Date utilizatori, produse, istoric prețuri, loguri |
+| Source code & docs | Git repository | Autor / Student | Tracked across `main` / feature branches |
+| Local/Test DB | data/pricemonitor.db | SQLite | Dezvoltare locală și teste `pytest` |
+| Container/Prod DB | postgres_data volume | PostgreSQL 16 | Configurat prin `DATABASE_URL=postgresql+psycopg://...` |
 | Error/Drift Snapshots | storage/snapshots/ | File system local | Fișiere HTML pentru depanare adaptoare |
 
 ## Configuration
 | Name | Where set | Used by | Notes |
 |---|---|---|---|
-| DATABASE_URL | .env / config | Bază de date | Cale către fișierul SQLite |
-| TELEGRAM_BOT_TOKEN | .env / config | Notificări Telegram | Token bot Telegram |
-| SMTP_* | .env / config | Serviciu Email | Configurare server email pentru alerte |
+| DATABASE_URL | .env / docker-compose.yml | app/db/session.py | SQLite local sau PostgreSQL 16 (`postgresql+psycopg://...`) |
+| SECRET_KEY | .env / config | app/core/security.py | Semnare HMAC-SHA256 cookie-uri sesiune (obligatoriu în producție) |
+| TELEGRAM_BOT_TOKEN | .env / config | Notificări Telegram | Token bot Telegram (Step 5) |
+| SMTP_* | .env / config | Serviciu Email | Configurare server email pentru alerte (Step 5) |
 
 ## Build, deploy, runtime
-- Python 3.10+
+- Python 3.12 (Docker) / 3.10+ (local)
 - Gestiune dependențe prin `requirements.txt`
-- Rulare teste: `pytest`
+- Container local: `docker compose up --build` (PostgreSQL 16 + FastAPI pe port 8000, `${PORT:-8000}` în `Dockerfile`)
+- Rulare teste: `pytest -v`
 - Verificare integritate ledger: `python3 docs/agents/tools/ledger-lint.py`
 
 ## Boundaries

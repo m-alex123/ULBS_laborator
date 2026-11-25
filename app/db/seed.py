@@ -19,15 +19,14 @@ from app.db.models import (
 from app.db.session import SessionLocal, init_db
 
 # Representative sneaker catalog matching DS-02 mock SKUs across the 3 approved Romanian
-# retailers (jdsports.ro, sizeer.ro, buzzsneakers.ro). Product image URLs preserve per-store
-# retailer attribution for the UI; UI views should fall back to local SVG/placeholder assets
-# if external images fail to load.
+# retailers (jdsports.ro, sizeer.ro, buzzsneakers.ro). Canonical image URLs use verified
+# HTTPS product photographs; UI views fall back to an offline SVG placeholder if unreachable.
 SEED_PRODUCTS = [
     {
         "name": "Nike Air Jordan 1 Low 'University Blue'",
         "brand": "Nike",
         "sku": "553558-403",
-        "image_url": "https://www.jdsports.ro/media/catalog/product/cache/nike-air-jordan-1-low-university-blue-553558-403.jpg",
+        "image_url": "https://images.stockx.com/images/Air-Jordan-1-Low-University-Blue-Black-Product.jpg?fit=fill&bg=FFFFFF&w=700&h=500&fm=webp&auto=compress&q=90&trim=color",
         "target_price": Decimal("470.00"),
         "listings": [
             {
@@ -84,7 +83,7 @@ SEED_PRODUCTS = [
         "name": "Adidas Originals Campus 00s Core Black",
         "brand": "Adidas",
         "sku": "HQ8708",
-        "image_url": "https://www.buzzsneakers.ro/files/thumbs/files/images/slike_proizvoda/media/HQ8/HQ8708/HQ8708.jpg",
+        "image_url": "https://images.stockx.com/images/adidas-Campus-00s-Core-Black-Product.jpg?fit=fill&bg=FFFFFF&w=700&h=500&fm=webp&auto=compress&q=90&trim=color",
         "target_price": Decimal("430.00"),
         "listings": [
             {
@@ -141,7 +140,7 @@ SEED_PRODUCTS = [
         "name": "Nike Air Jordan 1 Retro High OG 'Lost & Found'",
         "brand": "Nike",
         "sku": "DZ5485-612",
-        "image_url": "https://sizeer.ro/media/catalog/product/cache/nike-jordan-1-high-dz5485-612.jpg",
+        "image_url": "https://images.stockx.com/images/Air-Jordan-1-Retro-High-OG-Chicago-Reimagined-Product.jpg?fit=fill&bg=FFFFFF&w=700&h=500&fm=webp&auto=compress&q=90&trim=color",
         "target_price": Decimal("850.00"),
         "listings": [
             {
@@ -253,6 +252,8 @@ def seed_products_and_listings(session: Session) -> list[CanonicalProduct]:
             )
             session.add(product)
             session.flush()
+        elif product.image_url != prod_spec["image_url"]:
+            product.image_url = prod_spec["image_url"]
         canonical_products.append(product)
 
         for listing_spec in prod_spec["listings"]:

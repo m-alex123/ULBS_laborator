@@ -3,8 +3,9 @@
 screens:
   - id: DS-01
     name: Auth Login & Register
-    status: planned
+    status: implemented
     route: /login
+    template: app/web/templates/login.html
     mock: docs/design/mocks/ds-01-auth.html
     description: Clean authentication flow with tabbed Login and Register forms, password strength meter, remember me token, and demo account shortcuts for fast grading evaluation.
     components:

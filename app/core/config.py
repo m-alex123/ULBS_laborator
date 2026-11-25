@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = f"sqlite:///{PROJECT_ROOT / 'data' / 'pricemonitor.db'}"
     SNAPSHOTS_DIR: Path = PROJECT_ROOT / "storage" / "snapshots"
     SECRET_KEY: str = _DEV_SECRET_KEY
+    SESSION_COOKIE_NAME: str = "p23_session"
+    SESSION_MAX_AGE_SECONDS: int = Field(default=60 * 60 * 24 * 7, gt=0)
 
     # Ethical scraping & politeness policy (D-002)
     USER_AGENT: str = (

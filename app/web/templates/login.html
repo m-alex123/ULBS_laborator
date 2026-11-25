@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Autentificare — P23 Sneaker Price Monitor{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+  <section class="auth-card" aria-labelledby="login-heading">
+    <div class="auth-head">
+      <h1 id="login-heading">Autentificare PriceMonitor</h1>
+      <p>Monitorizare etică a prețurilor pe jdsports.ro, sizeer.ro și buzzsneakers.ro</p>
+    </div>
+
+    {% if error %}
+    <div class="auth-error-banner" role="alert">
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/login" id="login-form">
+      <div class="form-group">
+        <label for="email" class="input-label">Email</label>
+        <input
+          type="email"
+          id="email"
+          name="email"
+          class="text-input font-mono"
+          value="{{ email }}"
+          placeholder="user@pricemonitor.local"
+          required
+          autocomplete="email"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="password" class="input-label">Parolă</label>
+        <input
+          type="password"
+          id="password"
+          name="password"
+          class="text-input"
+          placeholder="••••••••"
+          required
+          autocomplete="current-password"
+        >
+      </div>
+
+      <button type="submit" class="btn-market-primary" style="width: 100%; margin-top: var(--space-2);">
+        Intră în Watchlist
+      </button>
+    </form>
+
+    {% if show_demo_shortcuts %}
+    <div class="demo-box">
+      <span class="demo-box-title">Conturi demonstrative (Development)</span>
+      <div class="demo-btn-row">
+        <button
+          type="button"
+          class="demo-pill"
+          onclick="fillDemoCredentials('{{ seed_user_email }}', '{{ seed_user_password }}')"
+        >
+          Demo User ({{ seed_user_email }})
+        </button>
+        <button
+          type="button"
+          class="demo-pill"
+          onclick="fillDemoCredentials('{{ seed_admin_email }}', '{{ seed_admin_password }}')"
+        >
+          Demo Admin ({{ seed_admin_email }})
+        </button>
+      </div>
+    </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function fillDemoCredentials(email, password) {
+    const emailEl = document.getElementById('email');
+    const passEl = document.getElementById('password');
+    if (emailEl) emailEl.value = email;
+    if (passEl) passEl.value = password;
+  }
+</script>
+{% endblock %}
