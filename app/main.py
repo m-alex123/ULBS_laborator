@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.db.session import engine, init_db
-from app.web.routers import auth, catalog, health, watchlist
+from app.web.routers import admin, auth, catalog, health, settings as settings_router, watchlist
 from app.worker.runner import run_background_worker_loop
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
@@ -63,6 +63,8 @@ def create_app(run_init_db: bool = True) -> FastAPI:
     application.include_router(auth.router)
     application.include_router(catalog.router)
     application.include_router(watchlist.router)
+    application.include_router(settings_router.router)
+    application.include_router(admin.router)
 
     return application
 

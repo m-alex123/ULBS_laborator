@@ -130,3 +130,14 @@ def require_admin(
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")
     return current_user
+
+
+def require_admin_ssr(
+    current_user: User | None = Depends(get_current_user),
+) -> User:
+    """Redirect unauthenticated SSR visitors to /login and enforce 403 for non-admins."""
+    if not current_user:
+        raise HTTPException(status_code=303, headers={"Location": "/login"})
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+    return current_user

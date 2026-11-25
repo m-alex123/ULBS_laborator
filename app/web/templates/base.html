@@ -64,6 +64,22 @@
               {% if active_nav == 'watchlist' %}aria-current="page"{% endif %}
             >Watchlist</a>
           </li>
+          <li>
+            <a
+              href="/settings"
+              class="nav-item-link {% if active_nav == 'settings' %}active{% endif %}"
+              {% if active_nav == 'settings' %}aria-current="page"{% endif %}
+            >Setări</a>
+          </li>
+          {% if user.role == 'admin' %}
+          <li>
+            <a
+              href="/admin"
+              class="nav-item-link {% if active_nav == 'admin' %}active{% endif %}"
+              {% if active_nav == 'admin' %}aria-current="page"{% endif %}
+            >Admin</a>
+          </li>
+          {% endif %}
           {% endif %}
         </ul>
       </nav>

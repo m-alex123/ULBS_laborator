@@ -64,10 +64,11 @@ screens:
 
   - id: DS-04
     name: Notification & Profile Settings
-    status: planned
+    status: implemented
     route: /settings
+    template: app/web/templates/settings.html
     mock: docs/design/mocks/ds-04-settings.html
-    description: User notification channel preferences (Email toggle and Telegram Bot pairing instructions with Chat ID test trigger) and alert frequency rules.
+    description: User notification channel preferences (Email toggle, Telegram Bot pairing instructions and Chat ID, safe test notification trigger) and recent NotificationLog history.
     components:
       - ProfileSummary
       - EmailNotificationSettings
@@ -82,10 +83,11 @@ screens:
 
   - id: DS-05
     name: Admin Scraper Health Dashboard
-    status: planned
+    status: implemented
     route: /admin
+    template: app/web/templates/admin.html
     mock: docs/design/mocks/ds-05-admin-health.html
-    description: Administrator operations panel for monitoring adapter health (Healthy/Degraded/Suspect/Circuit Open), inspecting drift anomalies, viewing/downloading HTML snapshots, and manual rescan triggering.
+    description: Administrator operations panel for monitoring adapter health, consecutive failures, escaped HTML snapshot inspection, adapter reset to healthy, and uncertain SKU deduplication review.
     components:
       - AdminNav
       - AdapterHealthCards (JD Sports, Sizeer, Buzz Sneakers)

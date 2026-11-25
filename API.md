@@ -1,7 +1,7 @@
 # API & HTTP Routes — P23 Ethical Sneaker Price Monitor
 
 > Contract specification for the FastAPI web application (`app/main.py`).
-> Corresponding ledger contracts: `C-001`, `C-002`, `C-003`, `C-007`, `C-008`, `C-009` in [docs/agents/CONTRACTS.md](file:///home/manol/Work/ULBS_laborator/docs/agents/CONTRACTS.md).
+> Corresponding ledger contracts: `C-001`, `C-002`, `C-003`, `C-007`, `C-008`, `C-009`, `C-010`, `C-011` in [docs/agents/CONTRACTS.md](file:///home/manol/Work/ULBS_laborator/docs/agents/CONTRACTS.md).
 
 ---
 
@@ -101,3 +101,33 @@ Session state is stored in an `HttpOnly`, `SameSite=Lax` cookie (`SESSION_COOKIE
 ### `POST /watchlist/{canonical_id}/target` & `POST /watchlist/{canonical_id}/delete`
 - **Auth & CSRF:** Required (`require_user`, `verify_csrf_request`; guests redirect `303 -> /login`).
 - **Behavior:** Updates `target_price` (`303 -> /products/{canonical_id}`) or removes the user's `WatchlistItem` (`303 -> /watchlist`).
+
+---
+
+## 6. User Notification & Profile Settings (`DS-04`, `C-010`)
+
+### `GET /settings`
+- **Auth:** Required (`require_user`, redirects `303 -> /login` for guests).
+- **Response:** `200 OK` (`text/html`) rendering `DS-04` with `User` email/role, Email & Telegram toggles, `telegram_chat_id`, pairing instructions, and recent `NotificationLog` rows.
+
+### `POST /settings/notifications`
+- **Auth & CSRF:** Required (`require_user`, `verify_csrf_request`).
+- **Form Fields:** `action` (`save` | `test`), `email_enabled`, `telegram_enabled`, `telegram_chat_id`.
+- **Behavior:** Saves user notification toggles (and syncs user's `WatchlistItem` channel flags); when `action=test`, triggers safe test delivery or preview notice when SMTP/Telegram tokens are unconfigured.
+
+---
+
+## 7. Admin Scraper Health & SKU Deduplication (`DS-05`, `C-011`)
+
+### `GET /admin`
+- **Auth:** Required (`require_admin_ssr`: `303 -> /login` for guests, `403 Forbidden` for `role="user"`).
+- **Query Parameters:** `snapshot_id` (optional `AdapterRunLog.id` to display escaped HTML snapshot preview).
+- **Response:** `200 OK` (`text/html`) rendering `DS-05` adapter health cards, consecutive failure counts, recent `AdapterRunLog` entries, and uncertain `ProductListing` SKU match queue.
+
+### `GET /admin/snapshots/{log_id}`
+- **Auth:** Required (`require_admin_ssr`).
+- **Response:** `200 OK` (`text/plain`) serving the snapshot HTML strictly from `SNAPSHOTS_DIR`, or `404` if missing/outside directory.
+
+### `POST /admin/adapters/{store}/reset` & `POST /admin/deduplication/{listing_id}/{confirm|reject}`
+- **Auth & CSRF:** Required (`require_admin_ssr`, `verify_csrf_request`).
+- **Behavior:** Resets `SiteConfig.adapter_status = "healthy"` and `circuit_breaker_open = False`, or merges/rejects uncertain `ProductListing` SKU matches safely under `uq_listing_product_store` (`303 -> /admin`).
