@@ -17,9 +17,18 @@ def _set_sqlite_pragma(dbapi_connection, connection_record) -> None:
     cursor.close()
 
 
+def normalize_database_url(url: str) -> str:
+    """Normalize PostgreSQL URLs to use the installed psycopg v3 driver."""
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://") :]
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://") :]
+    return url
+
+
 def create_db_engine(database_url: str | None = None) -> Engine:
     """Build a SQLAlchemy engine configured for SQLite (with FK enforcement) or PostgreSQL."""
-    url = database_url or settings.DATABASE_URL
+    url = normalize_database_url(database_url or settings.DATABASE_URL)
     is_sqlite = url.startswith("sqlite")
     engine_kwargs: dict[str, object] = {
         "connect_args": {"check_same_thread": False} if is_sqlite else {},
@@ -73,4 +82,9 @@ def init_db(target_engine: Engine | None = None, create_snapshots_dir: bool = Tr
 
     if create_snapshots_dir:
         settings.SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
-    Base.metadata.create_all(bind=bound_engine)
+    if bound_engine.dialect.name == "postgresql":
+        with bound_engine.begin() as conn:
+            conn.execute(text("SELECT pg_advisory_xact_lock(23001)"))
+            Base.metadata.create_all(bind=conn)
+    else:
+        Base.metadata.create_all(bind=bound_engine)

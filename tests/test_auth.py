@@ -123,3 +123,75 @@ def test_admin_role_enforcement(client) -> None:
     assert admin_resp.status_code == 200
     assert admin_resp.json()["role"] == "admin"
     assert admin_resp.json()["admin_email"] == settings.SEED_ADMIN_EMAIL
+
+
+def test_csrf_protection_blocks_cross_site_and_mismatched_tokens(client) -> None:
+    test_client, _ = client
+
+    cross_site_resp = test_client.post(
+        "/login",
+        data={"email": settings.SEED_USER_EMAIL, "password": settings.SEED_USER_PASSWORD},
+        headers={"Sec-Fetch-Site": "cross-site"},
+        follow_redirects=False,
+    )
+    assert cross_site_resp.status_code == 403
+
+    origin_resp = test_client.post(
+        "/login",
+        data={"email": settings.SEED_USER_EMAIL, "password": settings.SEED_USER_PASSWORD},
+        headers={"Origin": "https://evil.example"},
+        follow_redirects=False,
+    )
+    assert origin_resp.status_code == 403
+
+    # Fetch login page to get CSRF cookie, then submit with invalid csrf_token
+    get_login = test_client.get("/login")
+    assert get_login.status_code == 200
+    bad_csrf = test_client.post(
+        "/login",
+        data={
+            "email": settings.SEED_USER_EMAIL,
+            "password": settings.SEED_USER_PASSWORD,
+            "csrf_token": "wrong.token",
+        },
+        follow_redirects=False,
+    )
+    assert bad_csrf.status_code == 403
+
+
+def test_production_env_hides_demo_shortcuts_and_sets_secure_cookie(client, monkeypatch) -> None:
+    test_client, _ = client
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+
+    login_page = test_client.get("/login")
+    assert login_page.status_code == 200
+    assert "Demo User" not in login_page.text
+
+    resp = test_client.post(
+        "/login",
+        data={"email": settings.SEED_USER_EMAIL, "password": settings.SEED_USER_PASSWORD},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert "Secure" in resp.headers.get("set-cookie", "") or "secure" in resp.headers.get("set-cookie", "").lower()
+
+
+def test_role_change_invalidates_stale_session_cookie(client) -> None:
+    test_client, SessionLocal = client
+    from app.db.models import User
+
+    login_resp = test_client.post(
+        "/login",
+        data={"email": settings.SEED_ADMIN_EMAIL, "password": settings.SEED_ADMIN_PASSWORD},
+        follow_redirects=False,
+    )
+    assert login_resp.status_code == 303
+
+    with SessionLocal() as session:
+        admin = session.query(User).filter_by(email=settings.SEED_ADMIN_EMAIL).one()
+        admin.role = "user"
+        session.commit()
+
+    resp = test_client.get("/watchlist", follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/login"

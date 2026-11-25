@@ -121,3 +121,49 @@ def test_watchlist_shows_circuit_breaker_banner_and_empty_state(client) -> None:
     assert "CIRCUIT BREAKER ACTIVAT" in resp.text
     assert "buzzsneakers.ro" in resp.text
     assert "Niciun sneaker în monitorizare" in resp.text
+
+
+def test_watchlist_edge_cases_zero_price_out_of_stock_and_http_image_blocked(client) -> None:
+    test_client, SessionLocal = client
+    from app.services.watchlist_service import build_sparkline
+
+    assert build_sparkline([]).points == "2,14 70,14"
+    assert build_sparkline([Decimal("100.00"), Decimal("100.00")]).points == "2,14 70,14"
+
+    _login_as_demo_user(test_client)
+
+    with SessionLocal() as session:
+        user = session.query(User).filter_by(email=settings.SEED_USER_EMAIL).one()
+        edge_prod = CanonicalProduct(
+            name="Edge Case Sneaker",
+            brand="Nike",
+            sku="EDGE-001",
+            image_url="http://insecure.example/shoe.jpg",
+        )
+        session.add(edge_prod)
+        session.flush()
+        session.add(
+            ProductListing(
+                canonical_product_id=edge_prod.id,
+                store="jdsports",
+                url="https://www.jdsports.ro/edge-001",
+                current_price=Decimal("0.00"),
+                original_price=Decimal("500.00"),
+                raw_title="Zero Price Out Of Stock",
+                in_stock=False,
+            )
+        )
+        session.add(WatchlistItem(user_id=user.id, canonical_product_id=edge_prod.id))
+        session.commit()
+
+    resp = test_client.get("/watchlist", params={"q": "EDGE-001", "sort": "biggest_discount"})
+    assert resp.status_code == 200
+    assert "EDGE-001" in resp.text
+    assert "http://insecure.example/shoe.jpg" not in resp.text
+    assert "MOD OFFLINE" in resp.text
+    assert "OFERTĂ:" not in resp.text
+    assert "-100%" not in resp.text
+
+    no_match = test_client.get("/watchlist", params={"q": "NONEXISTENT-SKU-XYZ"})
+    assert no_match.status_code == 200
+    assert "Niciun rezultat pentru filtrele curente" in no_match.text

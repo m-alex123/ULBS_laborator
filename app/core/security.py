@@ -44,6 +44,8 @@ def create_session_token(
     expires_in_seconds: int = _DEFAULT_SESSION_TTL,
 ) -> str:
     """Create an HMAC-SHA256 signed URL-safe session token."""
+    if not secret_key:
+        raise ValueError("secret_key must be non-empty")
     payload = {
         "sub": int(user_id),
         "role": str(role),
@@ -84,3 +86,25 @@ def decode_session_token(token: str, secret_key: str) -> dict[str, Any] | None:
         }
     except (ValueError, KeyError, TypeError, json.JSONDecodeError, UnicodeDecodeError):
         return None
+
+
+def create_csrf_token(secret_key: str) -> str:
+    """Create an HMAC-SHA256 signed stateless CSRF token."""
+    if not secret_key:
+        raise ValueError("secret_key must be non-empty")
+    nonce = base64.urlsafe_b64encode(hashlib.sha256(f"{time.time_ns()}".encode()).digest()[:16]).decode("ascii").rstrip("=")
+    sig = hmac.new(secret_key.encode("utf-8"), nonce.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"{nonce}.{sig}"
+
+
+def verify_csrf_token(token: str | None, secret_key: str) -> bool:
+    """Verify an HMAC-SHA256 signed CSRF token."""
+    if not token or "." not in token or not secret_key:
+        return False
+    nonce, provided_sig = token.split(".", 1)
+    expected_sig = hmac.new(
+        secret_key.encode("utf-8"),
+        nonce.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(provided_sig, expected_sig)

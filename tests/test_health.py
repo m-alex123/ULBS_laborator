@@ -25,3 +25,13 @@ def test_health_returns_503_when_database_fails(client, monkeypatch) -> None:
     payload = response.json()
     assert payload["status"] == "error"
     assert payload["database"] == "unreachable"
+
+
+def test_check_db_connection_catches_sqlalchemy_error() -> None:
+    from app.db.session import check_db_connection
+
+    class BrokenSession:
+        def execute(self, _stmt):
+            raise OperationalError("SELECT 1", {}, Exception("connection refused"))
+
+    assert check_db_connection(BrokenSession()) is False  # type: ignore[arg-type]

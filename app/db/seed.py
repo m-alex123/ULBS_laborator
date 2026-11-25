@@ -1,7 +1,9 @@
+import time
 from datetime import timedelta
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -215,10 +217,18 @@ def seed_site_configs(session: Session) -> None:
 
 def seed_users(session: Session) -> dict[str, User]:
     """Ensure demo admin and regular user accounts exist."""
+    env = settings.ENVIRONMENT.strip().lower()
+    weak_passwords = {"Admin123!", "User123!", "change-me-admin-password", "change-me-user-password"}
     accounts = [
-        (settings.SEED_ADMIN_EMAIL, settings.SEED_ADMIN_PASSWORD, "admin"),
-        (settings.SEED_USER_EMAIL, settings.SEED_USER_PASSWORD, "user"),
+        (settings.SEED_ADMIN_EMAIL.strip().lower(), settings.SEED_ADMIN_PASSWORD, "admin"),
+        (settings.SEED_USER_EMAIL.strip().lower(), settings.SEED_USER_PASSWORD, "user"),
     ]
+    if env in {"production", "prod", "staging"}:
+        for _, password, role in accounts:
+            if password in weak_passwords or len(password) < 12:
+                raise ValueError(
+                    f"Default or weak SEED password for {role} is forbidden in {env}"
+                )
     users_by_email: dict[str, User] = {}
     for email, password, role in accounts:
         user = session.scalar(select(User).where(User.email == email))
@@ -354,10 +364,13 @@ def seed_adapter_run_logs(session: Session) -> None:
 def seed_all(session: Session) -> None:
     """Run all idempotent database seeders inside a rollback-safe transaction."""
     try:
+        bind = session.get_bind()
+        if bind is not None and bind.dialect.name == "postgresql":
+            session.execute(text("SELECT pg_advisory_xact_lock(23002)"))
         seed_site_configs(session)
         users = seed_users(session)
         products = seed_products_and_listings(session)
-        seed_watchlist_items(session, users[settings.SEED_USER_EMAIL], products)
+        seed_watchlist_items(session, users[settings.SEED_USER_EMAIL.strip().lower()], products)
         seed_adapter_run_logs(session)
         session.commit()
     except Exception:
@@ -365,11 +378,22 @@ def seed_all(session: Session) -> None:
         raise
 
 
-def main() -> None:
-    """Initialize schema and seed the configured database."""
-    init_db()
-    with SessionLocal() as session:
-        seed_all(session)
+def main(max_attempts: int = 10, retry_delay_seconds: float = 2.0) -> None:
+    """Initialize schema and seed the configured database with startup DB retry."""
+    last_error: OperationalError | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            init_db()
+            with SessionLocal() as session:
+                seed_all(session)
+            return
+        except OperationalError as exc:
+            last_error = exc
+            if attempt == max_attempts:
+                break
+            time.sleep(retry_delay_seconds)
+    assert last_error is not None
+    raise last_error
 
 
 if __name__ == "__main__":

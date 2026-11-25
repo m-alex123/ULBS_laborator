@@ -4,21 +4,28 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}P23 Sneaker Price Monitor{% endblock %}</title>
-  <link rel="stylesheet" href="/static/css/p23.css">
   <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('p23_theme');
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
+      } catch (_) {}
+    })();
     function handleSneakerImgError(img) {
       if (!img || img.dataset.fallbackApplied) return;
       img.dataset.fallbackApplied = 'true';
       img.hidden = true;
-      const box = img.closest('.card-photo-box');
+      var box = img.closest('.card-photo-box');
       if (!box) return;
       box.classList.add('is-offline');
-      const fallback = box.querySelector('.photo-offline-fallback');
+      var fallback = box.querySelector('.photo-offline-fallback');
       if (fallback) fallback.hidden = false;
-      const sourceBadge = box.querySelector('.photo-source-badge');
+      var sourceBadge = box.querySelector('.photo-source-badge');
       if (sourceBadge) sourceBadge.textContent = 'MOD OFFLINE';
     }
   </script>
+  <link rel="stylesheet" href="/static/css/p23.css">
 </head>
 <body>
   <svg style="display: none;" aria-hidden="true">
@@ -32,6 +39,7 @@
 
   {% block ticker %}{% endblock %}
 
+  {% set active_nav %}{% block active_nav %}{% endblock %}{% endset %}
   <header class="app-header">
     <div class="header-inner">
       <a href="/watchlist" class="brand-block" aria-label="PriceMonitor Acasă">
@@ -42,10 +50,13 @@
       {% if user %}
       <nav aria-label="Meniu principal">
         <ul class="nav-list">
-          <li><a href="/watchlist" class="nav-item-link active" aria-current="page">Watchlist</a></li>
-          {% if user.role == 'admin' %}
-          <li><a href="/admin/status" class="nav-item-link">Admin Status</a></li>
-          {% endif %}
+          <li>
+            <a
+              href="/watchlist"
+              class="nav-item-link {% if active_nav == 'watchlist' %}active{% endif %}"
+              {% if active_nav == 'watchlist' %}aria-current="page"{% endif %}
+            >Watchlist</a>
+          </li>
         </ul>
       </nav>
       {% endif %}
@@ -57,11 +68,12 @@
           <span class="role-pill">{{ user.role }}</span>
         </div>
         <form method="post" action="/logout" style="display: inline;">
+          {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token }}">{% endif %}
           <button type="submit" class="logout-btn">Ieșire</button>
         </form>
         {% endif %}
-        <button type="button" class="theme-toggle-btn" id="theme-btn" aria-label="Comută tema">
-          <span id="theme-symbol">🌙</span>
+        <button type="button" class="theme-toggle-btn" id="theme-btn" aria-label="Comută tema întunecată" aria-pressed="false">
+          <span id="theme-symbol" aria-hidden="true">🌙</span>
           <span id="theme-name">Întunecat</span>
         </button>
       </div>

@@ -4,8 +4,27 @@
   const themeSymbol = document.getElementById('theme-symbol');
   const themeName = document.getElementById('theme-name');
 
+  const handleSneakerImgError =
+    window.handleSneakerImgError ||
+    function (img) {
+      if (!img || img.dataset.fallbackApplied) return;
+      img.dataset.fallbackApplied = 'true';
+      img.hidden = true;
+      const box = img.closest('.card-photo-box');
+      if (!box) return;
+      box.classList.add('is-offline');
+      const fallback = box.querySelector('.photo-offline-fallback');
+      if (fallback) fallback.hidden = false;
+      const sourceBadge = box.querySelector('.photo-source-badge');
+      if (sourceBadge) sourceBadge.textContent = 'MOD OFFLINE';
+    };
+  window.handleSneakerImgError = handleSneakerImgError;
+
   function applyTheme(theme) {
     docRoot.setAttribute('data-theme', theme);
+    if (themeBtn) {
+      themeBtn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+    }
     if (themeSymbol && themeName) {
       if (theme === 'dark') {
         themeSymbol.textContent = '☀️';
@@ -22,15 +41,8 @@
     }
   }
 
-  let initialTheme = 'light';
-  try {
-    initialTheme =
-      localStorage.getItem('p23_theme') ||
-      (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-  } catch (_) {
-    initialTheme = 'light';
-  }
-  applyTheme(initialTheme);
+  const currentTheme = docRoot.getAttribute('data-theme') || 'light';
+  applyTheme(currentTheme);
 
   if (themeBtn) {
     themeBtn.addEventListener('click', () => {
@@ -41,9 +53,24 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.sneaker-photo').forEach((img) => {
-      if (img.complete && img.naturalWidth === 0 && typeof window.handleSneakerImgError === 'function') {
-        window.handleSneakerImgError(img);
+      img.addEventListener('error', () => handleSneakerImgError(img));
+      if (img.complete && img.naturalWidth === 0) {
+        handleSneakerImgError(img);
       }
+    });
+
+    const sortSelect = document.getElementById('sort-select');
+    if (sortSelect && sortSelect.form) {
+      sortSelect.addEventListener('change', () => sortSelect.form.submit());
+    }
+
+    document.querySelectorAll('[data-demo-email]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const emailEl = document.getElementById('email');
+        const passEl = document.getElementById('password');
+        if (emailEl) emailEl.value = btn.dataset.demoEmail || '';
+        if (passEl) passEl.value = btn.dataset.demoPassword || '';
+      });
     });
   });
 })();
