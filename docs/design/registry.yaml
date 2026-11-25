@@ -3,28 +3,28 @@
 screens:
   - id: DS-01
     name: Auth Login & Register
-    status: planned
+    status: partial
     route: /login
-    mock: docs/design/mocks/ds-01-auth.html
-    description: Clean authentication flow with tabbed Login and Register forms, password strength meter, remember me token, and demo account shortcuts for fast grading evaluation.
+    template: app/web/templates/login.html
+    description: Server-side login flow implemented with bcrypt and signed HttpOnly cookies (Register tab, password strength meter, and remember-me deferred).
     components:
       - BrandHeader
       - AuthCard
       - EmailPasswordForm
       - DemoAccountQuickFill
-      - SecurityNotice
     states:
       - default
       - invalid-credentials
-      - account-locked
-      - loading
 
   - id: DS-02
     name: User Watchlist Dashboard
-    status: approved
-    route: /dashboard
+    status: implemented
+    route: /watchlist
+    alias_routes:
+      - /
     mock: docs/design/mocks/ds-02-watchlist.html
-    description: Primary user screen featuring sneaker tracking cards with "Best Price" badge, real-time price drops, stock status, quick URL addition modal, filter chips, summary metrics, and circuit breaker notification banner.
+    template: app/web/templates/watchlist.html
+    description: Primary user screen featuring sneaker tracking cards with "Cel mai mic preț" badge, real product photography (object-fit contain + offline fallback), stock status, filter chips, search, sort, and circuit breaker notification banner (AddProductModal & SkeletonLoaderCard deferred to Step 3).
     components:
       - AppNavigation
       - ScraperStatusBanner

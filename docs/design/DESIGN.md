@@ -35,8 +35,8 @@ These variables are defined on `:root` (Light mode) and overridden under `[data-
 | `--color-bg-secondary` | `#F4F4F4` (light gray) | `#1F1F1F` (secondary dark) | Sneaker image backdrop, ticker strip |
 | `--color-bg-tertiary` | `#EAEAEA` | `#262626` | Inputs, hover rows, inactive chips |
 | `--color-text-primary` | `#0D0D0D` (pitch black) | `#F5F5F5` (crisp white) | Brand, titles, lowest prices |
-| `--color-text-secondary` | `#555555` | `#A3A3A3` | Metadata, SKU, store labels |
-| `--color-text-muted` | `#767676` | `#737373` | Timestamps, table captions, hints |
+| `--color-text-secondary` | `#555555` | `#B3B3B3` | Metadata, SKU, store labels |
+| `--color-text-muted` | `#666666` | `#8E8E8E` | Timestamps, table captions, hints (WCAG AA) |
 | `--color-border-subtle` | `#EEEEEE` | `#222222` | Inner dividers, secondary borders |
 | `--color-border-default` | `#E5E5E5` | `#2A2A2A` | Standard 1px card and table borders |
 | `--color-border-strong` | `#CCCCCC` | `#404040` | Active controls, hover card borders |
@@ -130,10 +130,10 @@ These variables are defined on `:root` (Light mode) and overridden under `[data-
 ## 5. P23 Sneaker Card Anatomy
 
 1. **Card Frame**: 1px flat border (`var(--color-border-default)`), sharp 6px radius (`var(--radius-md)`), background `var(--color-bg-surface)`.
-2. **Visual Area**: 200px fixed height box on neutral presentation background (`#F4F4F4` Light / `#1F1F1F` Dark) with clean product silhouette and studio floor contact drop shadow.
+2. **Visual Area**: 200px fixed height box on neutral presentation background (`#F4F4F4` Light / `#1F1F1F` Dark) displaying real HTTPS product photography (`object-fit: contain`, `mix-blend-mode: multiply` in Light mode, framed `#FFFFFF` stage in Dark mode), retailer attribution badge, photo source badge, and clean offline SVG fallback.
 3. **Market Metrics**:
    - Label: `CEL MAI MIC PREȚ` in uppercase 10px tracking.
    - Price: Bold `font-mono` in `var(--color-text-primary)` (e.g., `489.99 RON`).
    - Sparkline SVG: 7-point mini trend line visualising 30-day price movement.
 4. **Multi-Store Ticker Table**: Compact 3-row grid comparing `jdsports.ro`, `sizeer.ro`, `buzzsneakers.ro` with active store tag and lowest price green badge.
-5. **Title Resiliency**: 2-line clamping with `min-height: 2.6rem` preventing vertical card misalignment.
+5. **Title Resiliency**: 2-line clamping (`line-height: 1.25rem; min-height: 2.5rem; max-height: 2.5rem`) with `title` tooltip preventing vertical card misalignment and line-3 bleed.

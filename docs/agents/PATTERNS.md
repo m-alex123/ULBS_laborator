@@ -8,6 +8,7 @@
 ## Index
 - PATTERN-001 · SQLite Foreign Keys Enforcement & SQLAlchemy 2.0 Typed Declarative Models · candidate
 - PATTERN-002 · Idempotent Database Seeding · candidate
+- PATTERN-003 · HMAC-SHA256 Signed HttpOnly Session Cookies & Server-Side Role Guards · candidate
 
 ---
 
@@ -42,4 +43,17 @@ def seed_site_configs(session):
         if not existing:
             session.add(SiteConfig(store=store, **defaults))
     session.commit()
+```
+
+## PATTERN-003 · HMAC-SHA256 Signed HttpOnly Session Cookies & Server-Side Role Guards
+- **Status:** candidate
+- **How:** Authenticate SSR FastAPI routes with HMAC-SHA256 signed `HttpOnly` (`SameSite=Lax`, `Secure` in production) cookies resolved per request against the `User` table, pairing `require_user` (303 redirect to `/login`) with `require_admin` (`401`/`403` enforcement).
+- **Example:**
+```python
+def require_admin(current_user: User | None = Depends(get_current_user)) -> User:
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+    return current_user
 ```

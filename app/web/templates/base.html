@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ro" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}P23 Sneaker Price Monitor{% endblock %}</title>
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('p23_theme');
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
+      } catch (_) {}
+    })();
+    function handleSneakerImgError(img) {
+      if (!img || img.dataset.fallbackApplied) return;
+      img.dataset.fallbackApplied = 'true';
+      img.hidden = true;
+      var box = img.closest('.card-photo-box');
+      if (!box) return;
+      box.classList.add('is-offline');
+      var fallback = box.querySelector('.photo-offline-fallback');
+      if (fallback) fallback.hidden = false;
+      var sourceBadge = box.querySelector('.photo-source-badge');
+      if (sourceBadge) sourceBadge.textContent = 'MOD OFFLINE';
+    }
+  </script>
+  <link rel="stylesheet" href="/static/css/p23.css">
+</head>
+<body>
+  <svg style="display: none;" aria-hidden="true">
+    <symbol id="icon-sneaker-offline" viewBox="0 0 64 36" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 27h52v4H6z"/>
+      <path d="M8 27l3-13c4 4 10 5 15 1l4 4c8 1 18 3 26 5 1 1 2 2 2 3"/>
+    </symbol>
+  </svg>
+
+  <a href="#main-content" class="skip-link">Sari la conținutul principal</a>
+
+  {% block ticker %}{% endblock %}
+
+  {% set active_nav %}{% block active_nav %}{% endblock %}{% endset %}
+  <header class="app-header">
+    <div class="header-inner">
+      <a href="/watchlist" class="brand-block" aria-label="PriceMonitor Acasă">
+        <span class="brand-name">PriceMonitor</span>
+        <span class="brand-tag">P23 ENGINE</span>
+      </a>
+
+      {% if user %}
+      <nav aria-label="Meniu principal">
+        <ul class="nav-list">
+          <li>
+            <a
+              href="/watchlist"
+              class="nav-item-link {% if active_nav == 'watchlist' %}active{% endif %}"
+              {% if active_nav == 'watchlist' %}aria-current="page"{% endif %}
+            >Watchlist</a>
+          </li>
+        </ul>
+      </nav>
+      {% endif %}
+
+      <div class="header-actions">
+        {% if user %}
+        <div class="header-user">
+          <span>{{ user.email }}</span>
+          <span class="role-pill">{{ user.role }}</span>
+        </div>
+        <form method="post" action="/logout" style="display: inline;">
+          {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token }}">{% endif %}
+          <button type="submit" class="logout-btn">Ieșire</button>
+        </form>
+        {% endif %}
+        <button type="button" class="theme-toggle-btn" id="theme-btn" aria-label="Comută tema întunecată" aria-pressed="false">
+          <span id="theme-symbol" aria-hidden="true">🌙</span>
+          <span id="theme-name">Întunecat</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="/static/js/p23.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -70,3 +70,26 @@ def test_settings_enforces_d002_politeness_bounds_and_prod_secret() -> None:
 
     with pytest.raises(ValidationError):
         Settings(ENVIRONMENT="production")
+
+    with pytest.raises(ValidationError):
+        Settings(ENVIRONMENT="staging", SECRET_KEY="too-short-secret")
+
+    with pytest.raises(ValidationError):
+        Settings(
+            ENVIRONMENT="production",
+            SECRET_KEY="replace-with-strong-random-secret-key",
+        )
+
+
+def test_normalize_database_url_maps_postgres_prefixes() -> None:
+    from app.db.session import normalize_database_url
+
+    assert (
+        normalize_database_url("postgres://u:p@host:5432/db")
+        == "postgresql+psycopg://u:p@host:5432/db"
+    )
+    assert (
+        normalize_database_url("postgresql://u:p@host:5432/db")
+        == "postgresql+psycopg://u:p@host:5432/db"
+    )
+    assert normalize_database_url("sqlite:///./data/pricemonitor.db") == "sqlite:///./data/pricemonitor.db"

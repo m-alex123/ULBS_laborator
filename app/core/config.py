@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = f"sqlite:///{PROJECT_ROOT / 'data' / 'pricemonitor.db'}"
     SNAPSHOTS_DIR: Path = PROJECT_ROOT / "storage" / "snapshots"
     SECRET_KEY: str = _DEV_SECRET_KEY
+    SESSION_COOKIE_NAME: str = "p23_session"
+    SESSION_MAX_AGE_SECONDS: int = Field(default=60 * 60 * 24 * 7, gt=0)
 
     # Ethical scraping & politeness policy (D-002)
     USER_AGENT: str = (
@@ -54,11 +56,20 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_secret(self) -> "Settings":
-        """Prevent running in production mode with the default development SECRET_KEY."""
-        if self.ENVIRONMENT.lower() == "production" and (
-            not self.SECRET_KEY or self.SECRET_KEY == _DEV_SECRET_KEY
-        ):
-            raise ValueError("SECRET_KEY must be explicitly set in production environment")
+        """Enforce strong SECRET_KEY and non-default seed passwords in production/staging."""
+        env = self.ENVIRONMENT.strip().lower()
+        self.ENVIRONMENT = env
+        if env in {"production", "prod", "staging"}:
+            secret = self.SECRET_KEY.strip()
+            weak_secrets = {
+                "",
+                _DEV_SECRET_KEY,
+                "replace-with-strong-random-secret-key",
+            }
+            if secret in weak_secrets or len(secret) < 32:
+                raise ValueError(
+                    "SECRET_KEY must be at least 32 characters and non-default in production/staging"
+                )
         return self
 
 

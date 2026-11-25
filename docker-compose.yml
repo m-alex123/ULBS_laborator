@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pricemonitor}
+      POSTGRES_USER: ${POSTGRES_USER:-pricemonitor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pricemonitor}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pricemonitor} -d ${POSTGRES_DB:-pricemonitor}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  web:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      APP_NAME: ${APP_NAME:-P23 Ethical Sneaker Price Monitor}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pricemonitor}:${POSTGRES_PASSWORD:-pricemonitor}@db:5432/${POSTGRES_DB:-pricemonitor}
+      SECRET_KEY: ${SECRET_KEY:-dev-only-change-before-production}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@pricemonitor.local}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-Admin123!}
+      SEED_USER_EMAIL: ${SEED_USER_EMAIL:-user@pricemonitor.local}
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-User123!}
+    volumes:
+      - ./storage/snapshots:/app/storage/snapshots
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os, urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\\\"PORT\\\", \\\"8000\\\")}/health', timeout=3)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  postgres_data:
