@@ -8,6 +8,7 @@ import logging
 import sys
 import time
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -23,6 +24,7 @@ from app.scraping.polite_client import (
     PoliteClientError,
     PoliteHttpClient,
 )
+from app.services.notification_service import SmtpSender, dispatch_price_drop_alerts
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,7 @@ class ScrapeCycleSummary:
     skipped_circuit_breaker: int = 0
     skipped_rate_limit: int = 0
     skipped_not_due: int = 0
+    alerts_sent: int = 0
 
 
 def _is_due(listing: ProductListing, interval_minutes: int, now: datetime) -> bool:
@@ -53,6 +56,8 @@ def run_scrape_cycle(
     polite_client: PoliteHttpClient | None = None,
     force: bool = False,
     now: datetime | None = None,
+    smtp_sender: SmtpSender | None = None,
+    telegram_client: httpx.Client | None = None,
 ) -> ScrapeCycleSummary:
     """Iterate active ProductListings respectfully through PoliteHttpClient and drift detection."""
     current_time = now or utcnow()
@@ -128,6 +133,14 @@ def run_scrape_cycle(
             summary.processed += 1
             if outcome.status == "valid":
                 summary.succeeded += 1
+                if outcome.should_notify_users:
+                    summary.alerts_sent += dispatch_price_drop_alerts(
+                        db,
+                        listing=listing,
+                        outcome=outcome,
+                        smtp_sender=smtp_sender,
+                        telegram_client=telegram_client,
+                    )
             elif outcome.status == "suspect":
                 summary.suspect += 1
             else:

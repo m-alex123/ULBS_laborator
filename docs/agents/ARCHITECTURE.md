@@ -18,8 +18,8 @@ Proiectul P23: Monitor de prețuri cu scraping etic pentru încălțăminte spor
   │     ├── main.py             (Entrypoint FastAPI, lifespan, static, routere)
   │     ├── core/               (Configurare Pydantic Settings & securitate bcrypt/HMAC)
   │     ├── db/                 (Session SQLite/PostgreSQL, modele ORM, seed idempotent)
-  │     ├── services/           (Servicii domeniu: watchlist_service.py, ingestion_service.py)
-  │     ├── web/                (Routere health/auth/catalog/watchlist, deps, Jinja2, static CSS/JS)
+  │     ├── services/           (Servicii domeniu: watchlist, ingestion, notification, admin)
+  │     ├── web/                (Routere health/auth/catalog/watchlist/settings/admin, deps, Jinja2, static CSS/JS)
   │     ├── scraping/           (Step 3: price_parser, polite_client, adapters/, drift_detector, deduplicator)
   │     └── worker/             (Step 4: runner.py CLI `--once` și buclă opțională de polling)
   ├── data/                     (Bază de date locală SQLite: pricemonitor.db)
@@ -31,12 +31,12 @@ Proiectul P23: Monitor de prețuri cu scraping etic pentru încălțăminte spor
 | Part | Path | Responsibility | Talks to |
 |---|---|---|---|
 | Documentation & Contracts | docs/, API.md, README.md, TODO.md | Guvernanță, specificații, decizii, contracte HTTP | Dezvoltatori, Evaluatori |
-| Web Application | app/main.py, app/web/ | Rute FastAPI (`/health`, `/login`, `/register`, `/catalog`, `/products/{id}`, `/watchlist`), sesiuni `HttpOnly`, șabloane Jinja2 (`DS-01`..`DS-03`) | Utilizatori, Vizitatori Guest, Administrator |
-| Domain Services | app/services/ | Agregare watchlist & catalog public, comparație `DS-03`, ingestie URL etică, sparkline, filtrare/sortare | Web App, Scraping Engine, Database |
+| Web Application | app/main.py, app/web/ | Rute FastAPI (`/health`, `/login`, `/register`, `/catalog`, `/products/{id}`, `/watchlist`, `/settings`, `/admin`), sesiuni `HttpOnly`, șabloane Jinja2 (`DS-01`..`DS-05`) | Utilizatori, Vizitatori Guest, Administrator |
+| Domain Services | app/services/ | Watchlist & catalog public, `DS-03`, ingestie URL etică, dispatch Email/Telegram, operațiuni admin `DS-05` | Web App, Scraping Engine, Worker, Database |
 | Security & Config | app/core/ | Setări mediu (`pydantic-settings`), hashing `bcrypt`, cookie-uri semnate HMAC-SHA256 | Web App, Database |
-| Database & Models | app/db/, data/ | Modele SQLAlchemy 2.0, engine dual SQLite / PostgreSQL 16, seed idempotent | Web App, Services, Worker |
+| Database & Models | app/db/, data/ | Modele SQLAlchemy 2.0, migrări aditive idempotente, engine dual SQLite / PostgreSQL 16, seed idempotent | Web App, Services, Worker |
 | Ethical Scraping Engine | app/scraping/ | Parser pur RO (`price_parser`), client politicos `robots.txt` (`polite_client`), adaptoare (`adapters/`), detecție derivă (`drift_detector`), deduplicare SKU (`deduplicator`) | Magazine online, Database, Storage |
-| Background Worker | app/worker/runner.py | Ciclu politicos de verificare (`run_scrape_cycle`), CLI `--once`, buclă opțională controlată prin `ENABLE_BACKGROUND_WORKER` | Scraping Engine, Database |
+| Background Worker | app/worker/runner.py | Ciclu politicos de verificare (`run_scrape_cycle`), declanșare alerte validate, CLI `--once`, buclă opțională | Scraping Engine, Notification Service, Database |
 
 ## Data flow
 1. Vizitatorii neautentificați (Guest) pot naviga catalogul public read-only (`GET /catalog`) și pagina detaliată `DS-03` (`GET /products/{canonical_id}`), iar utilizatorii autentificați își administrează Watchlist-ul (`GET/POST /watchlist`, `POST /watchlist/{id}/target`, `POST /watchlist/{id}/delete`).

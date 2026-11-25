@@ -71,6 +71,18 @@ def check_db_connection(db: Session) -> bool:
 _ADDITIVE_MIGRATIONS: tuple[tuple[str, str, str, str], ...] = (
     # (table_name, column_name, postgres_ddl, sqlite_ddl)
     (
+        "users",
+        "email_enabled",
+        "BOOLEAN NOT NULL DEFAULT TRUE",
+        "BOOLEAN NOT NULL DEFAULT 1",
+    ),
+    (
+        "users",
+        "telegram_enabled",
+        "BOOLEAN NOT NULL DEFAULT FALSE",
+        "BOOLEAN NOT NULL DEFAULT 0",
+    ),
+    (
         "site_configs",
         "adapter_status",
         "VARCHAR(20) NOT NULL DEFAULT 'healthy'",

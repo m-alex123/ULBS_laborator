@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Setări Notificări — P23 Sneaker Price Monitor{% endblock %}
+{% block active_nav %}settings{% endblock %}
+
+{% block content %}
+<div class="main-wrapper">
+  <div class="action-header">
+    <div class="action-title-group">
+      <h1>Setări Profil &amp; Notificări</h1>
+      <p>Configurează canalele Email (SMTP) și Telegram pentru alertele Watchlist</p>
+    </div>
+    <div class="header-user">
+      <span class="font-mono">{{ user.email }}</span>
+      <span class="role-pill">{{ user.role }}</span>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="auth-error-banner" role="alert">{{ error }}</div>
+  {% endif %}
+
+  {% if status_messages %}
+  <section class="status-success-banner" role="status" aria-label="Status operațiune">
+    {% for msg in status_messages %}
+    <p>{{ msg }}</p>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <div class="settings-grid">
+    <section class="detail-panel" aria-labelledby="channels-heading">
+      <h2 id="channels-heading" class="section-heading">Canale de Alertare</h2>
+      <form method="post" action="/settings/notifications">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="pref-row">
+          <label class="pref-checkbox-label">
+            <input type="checkbox" name="email_enabled" {% if user.email_enabled %}checked{% endif %}>
+            <span>Notificări Email (SMTP) către <strong class="font-mono">{{ user.email }}</strong></span>
+          </label>
+          <p class="pref-hint">Primești email automat când un produs din Watchlist ajunge sub pragul țintă.</p>
+        </div>
+
+        <div class="pref-row">
+          <label class="pref-checkbox-label">
+            <input type="checkbox" name="telegram_enabled" {% if user.telegram_enabled %}checked{% endif %}>
+            <span>Notificări Telegram Bot</span>
+          </label>
+          <p class="pref-hint">
+            Deschide botul PriceMonitor pe Telegram, trimite <code>/start</code>, apoi introdu Chat ID-ul numeric mai jos.
+          </p>
+        </div>
+
+        <div class="form-group">
+          <label for="telegram-chat-id" class="input-label">Telegram Chat ID</label>
+          <input
+            type="text"
+            id="telegram-chat-id"
+            name="telegram_chat_id"
+            class="text-input font-mono"
+            value="{{ user.telegram_chat_id or '' }}"
+            placeholder="ex: 123456789"
+          >
+        </div>
+
+        <div class="demo-btn-row">
+          <button type="submit" name="action" value="save" class="btn-market-primary">
+            Salvează preferințe
+          </button>
+          <button type="submit" name="action" value="test" class="btn-secondary-outline">
+            Trimite notificare test
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="detail-panel" aria-labelledby="logs-heading">
+      <h2 id="logs-heading" class="section-heading">Istoric Recent Notificări</h2>
+      {% if logs %}
+      <div class="table-scroll">
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>Data (UTC)</th>
+              <th>Canal</th>
+              <th>Motiv</th>
+              <th>Mesaj</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in logs %}
+            <tr>
+              <td class="font-mono" style="font-size: var(--text-xs);">{{ log.sent_at.strftime("%Y-%m-%d %H:%M") }}</td>
+              <td><span class="role-pill">{{ log.channel }}</span></td>
+              <td class="font-mono" style="font-size: var(--text-xs);">{{ log.trigger_reason }}</td>
+              <td style="font-size: var(--text-xs);">{{ log.message_payload }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-desc" style="text-align: left;">Nu există notificări trimise încă.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

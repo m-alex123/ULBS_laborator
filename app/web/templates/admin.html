@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Scraper Health — P23 Price Monitor{% endblock %}
+{% block active_nav %}admin{% endblock %}
+
+{% block content %}
+<div class="main-wrapper">
+  <div class="action-header">
+    <div class="action-title-group">
+      <h1>Admin Scraper Health &amp; Deduplicare</h1>
+      <p>Monitorizare adaptoare, inspectare snapshot-uri HTML la derivă și confirmare potriviri SKU</p>
+    </div>
+  </div>
+
+  <section aria-labelledby="adapters-heading">
+    <h2 id="adapters-heading" class="section-heading">Stare Adaptoare (3 Retaileri)</h2>
+    <div class="admin-store-grid">
+      {% for card in store_cards %}
+      <article class="detail-panel admin-store-card">
+        <div class="brand-sku-row">
+          <span class="store-badge {{ card.store_code }}">{{ card.store_label }}</span>
+          <span class="adapter-status-pill status-{{ card.adapter_status }}">{{ card.adapter_status }}</span>
+        </div>
+        <div class="font-mono" style="font-size: var(--text-xs); color: var(--color-text-secondary); margin: var(--space-2) 0;">
+          {{ card.domain }} · {{ card.listing_count }} listări · polling {{ card.polling_interval_minutes }}m · delay &ge; {{ card.min_delay_seconds }}s
+        </div>
+        <div class="admin-metrics-row">
+          <div>
+            <span class="stat-label">Eșecuri consecutive</span>
+            <strong class="font-mono">{{ card.consecutive_failures }}</strong>
+          </div>
+          <div>
+            <span class="stat-label">Circuit Breaker</span>
+            <strong class="font-mono">{{ 'OPEN' if card.circuit_breaker_open else 'CLOSED' }}</strong>
+          </div>
+        </div>
+        {% if card.adapter_status != 'healthy' or card.circuit_breaker_open %}
+        <form method="post" action="/admin/adapters/{{ card.store }}/reset" style="margin-top: var(--space-3);">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn-market-primary btn-sm">Confirmă &amp; Resetează la Healthy</button>
+        </form>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% if snapshot_preview %}
+  <section class="detail-panel" aria-labelledby="snapshot-heading">
+    <div class="history-header-row">
+      <h2 id="snapshot-heading" class="section-heading">
+        Snapshot HTML #{{ snapshot_preview.log.id }} ({{ snapshot_preview.log.store }})
+      </h2>
+      <div class="demo-btn-row">
+        <a href="/admin/snapshots/{{ snapshot_preview.log.id }}" target="_blank" rel="noopener noreferrer" class="btn-secondary-outline btn-sm">
+          Deschide text brut ↗
+        </a>
+        <a href="/admin" class="logout-btn">Închide</a>
+      </div>
+    </div>
+    <p class="font-mono" style="font-size: var(--text-xs); color: var(--color-loss-red); margin-bottom: var(--space-2);">
+      Motiv derivă: {{ snapshot_preview.log.error_message or 'N/A' }}
+    </p>
+    <pre class="snapshot-code"><code>{{ snapshot_preview.content }}</code></pre>
+  </section>
+  {% endif %}
+
+  <section class="detail-panel" aria-labelledby="dedup-heading">
+    <h2 id="dedup-heading" class="section-heading">Potriviri SKU Incerte pentru Confirmare</h2>
+    {% if review_rows %}
+    <div class="table-scroll">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Magazin</th>
+            <th>Titlu extras</th>
+            <th>Preț</th>
+            <th>Potrivire sugerată</th>
+            <th>Încredere</th>
+            <th>Acțiuni</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in review_rows %}
+          <tr>
+            <td><span class="store-badge {{ row.store_code }}">{{ row.store_label }}</span></td>
+            <td>{{ row.listing.raw_title }}</td>
+            <td class="font-mono">{% if row.listing.current_price is not none %}{{ "%.2f"|format(row.listing.current_price) }} RON{% else %}N/A{% endif %}</td>
+            <td>
+              {% if row.suggested_canonical %}
+              <strong>{{ row.suggested_canonical.name }}</strong>
+              <span class="font-mono" style="font-size: var(--text-xs);">({{ row.suggested_canonical.sku }})</span>
+              {% else %}
+              —
+              {% endif %}
+            </td>
+            <td class="font-mono">{% if row.listing.match_confidence is not none %}{{ "%.0f"|format(row.listing.match_confidence * 100) }}%{% else %}—{% endif %}</td>
+            <td>
+              <div class="demo-btn-row">
+                <form method="post" action="/admin/deduplication/{{ row.listing.id }}/confirm" style="display: inline;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="btn-market-primary btn-sm">Confirmă comasare</button>
+                </form>
+                <form method="post" action="/admin/deduplication/{{ row.listing.id }}/reject" style="display: inline;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="logout-btn">Păstrează separat</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty-desc" style="text-align: left;">Nicio potrivire SKU incertă în așteptare.</p>
+    {% endif %}
+  </section>
+
+  <section class="detail-panel" aria-labelledby="run-logs-heading">
+    <h2 id="run-logs-heading" class="section-heading">Jurnal Rulări Adaptoare</h2>
+    {% if recent_logs %}
+    <div class="table-scroll">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Data (UTC)</th>
+            <th>Magazin</th>
+            <th>Status</th>
+            <th>Mesaj</th>
+            <th>Snapshot</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in recent_logs %}
+          <tr>
+            <td class="font-mono" style="font-size: var(--text-xs);">{{ log.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+            <td class="font-mono">{{ log.store }}</td>
+            <td><span class="adapter-status-pill status-{{ log.status }}">{{ log.status }}</span></td>
+            <td style="font-size: var(--text-xs);">{{ log.error_message or 'OK' }}</td>
+            <td>
+              {% if log.snapshot_path %}
+              <a href="/admin?snapshot_id={{ log.id }}" class="btn-secondary-outline btn-sm">Inspectează HTML</a>
+              {% else %}
+              —
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty-desc" style="text-align: left;">Nu există rulări înregistrate.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -18,6 +18,8 @@
 - C-007 · Public Guest Catalog & DS-03 Product Comparison Contract · provided
 - C-008 · Authenticated Watchlist Mutation & URL Ingestion Contract · provided
 - C-009 · Background Scraper Worker & CLI Cycle Contract · provided
+- C-010 · DS-04 User Notification Settings & Alert Dispatcher Contract · provided
+- C-011 · DS-05 Admin Adapter Health & Deduplication Review Contract · provided
 
 ---
 
@@ -74,8 +76,20 @@
 ### C-009 · Background Scraper Worker & CLI Cycle Contract
 - **Status:** approved
 - **Confirmed:** 2026-11-25
-- **Interface:** `run_scrape_cycle(db, *, polite_client=None, force=False, now=None)` iterates active `ProductListing` rows respecting `SiteConfig.circuit_breaker_open`, polling intervals, and `PoliteHttpClient` rate limits, returning `ScrapeCycleSummary`; `python -m app.worker.runner --once` executes a single forced cycle and `settings.ENABLE_BACKGROUND_WORKER` (`False` by default) gates optional FastAPI lifespan background scheduling.
-- **Evidence:** Implemented in [app/worker/runner.py](file:///home/manol/Work/ULBS_laborator/app/worker/runner.py) and [app/main.py](file:///home/manol/Work/ULBS_laborator/app/main.py); tested in [tests/test_worker_runner.py](file:///home/manol/Work/ULBS_laborator/tests/test_worker_runner.py).
+- **Interface:** `run_scrape_cycle(db, *, polite_client=None, force=False, now=None, smtp_sender=None, telegram_client=None)` iterates active `ProductListing` rows respecting `SiteConfig.circuit_breaker_open`, polling intervals, and `PoliteHttpClient` rate limits, invokes `dispatch_price_drop_alerts` on valid scrapes (`outcome.should_notify_users=True`), and returns `ScrapeCycleSummary` (including `alerts_sent`); `python -m app.worker.runner --once` executes a single forced cycle and `settings.ENABLE_BACKGROUND_WORKER` (`False` by default) gates optional FastAPI lifespan background scheduling.
+- **Evidence:** Implemented in [app/worker/runner.py](file:///home/manol/Work/ULBS_laborator/app/worker/runner.py) and [app/main.py](file:///home/manol/Work/ULBS_laborator/app/main.py); tested in [tests/test_worker_runner.py](file:///home/manol/Work/ULBS_laborator/tests/test_worker_runner.py) and [tests/test_notifications.py](file:///home/manol/Work/ULBS_laborator/tests/test_notifications.py).
+
+### C-010 · DS-04 User Notification Settings & Alert Dispatcher Contract
+- **Status:** approved
+- **Confirmed:** 2026-11-25
+- **Interface:** `GET /settings` and `POST /settings/notifications` (`require_user`, `verify_csrf_request`) persist `User.email_enabled`, `User.telegram_enabled`, and `User.telegram_chat_id`, trigger safe test notifications (or preview status when SMTP/Telegram tokens are unconfigured), and render recent `NotificationLog` history; `send_email_alert`, `send_telegram_alert`, and `dispatch_price_drop_alerts` strictly suppress alerts on `suspect` scrapes and deduplicate repeated price drops via `NotificationLog`.
+- **Evidence:** Implemented in [app/services/notification_service.py](file:///home/manol/Work/ULBS_laborator/app/services/notification_service.py) and [app/web/routers/settings.py](file:///home/manol/Work/ULBS_laborator/app/web/routers/settings.py); documented in [API.md](file:///home/manol/Work/ULBS_laborator/API.md); tested in [tests/test_notifications.py](file:///home/manol/Work/ULBS_laborator/tests/test_notifications.py) and [tests/test_settings_ds04.py](file:///home/manol/Work/ULBS_laborator/tests/test_settings_ds04.py).
+
+### C-011 · DS-05 Admin Adapter Health & Deduplication Review Contract
+- **Status:** approved
+- **Confirmed:** 2026-11-25
+- **Interface:** `GET /admin`, `GET /admin/snapshots/{log_id}`, `POST /admin/adapters/{store}/reset`, and `POST /admin/deduplication/{listing_id}/{confirm|reject}` enforce `require_admin_ssr` (`303 -> /login` for guests, `403` for `role="user"`) and `verify_csrf_request`, display per-store health + consecutive failures + escaped snapshot previews strictly confined to `SNAPSHOTS_DIR`, reset adapters/circuit breakers to `healthy`, and confirm/reject uncertain SKU matches safely under `uq_listing_product_store`.
+- **Evidence:** Implemented in [app/services/admin_service.py](file:///home/manol/Work/ULBS_laborator/app/services/admin_service.py) and [app/web/routers/admin.py](file:///home/manol/Work/ULBS_laborator/app/web/routers/admin.py); documented in [API.md](file:///home/manol/Work/ULBS_laborator/API.md); tested in [tests/test_admin_ds05.py](file:///home/manol/Work/ULBS_laborator/tests/test_admin_ds05.py).
 
 ## Consumed
 
