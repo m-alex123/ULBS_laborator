@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from pathlib import Path
 
-from sqlalchemy import Engine, create_engine, event, text
+from sqlalchemy import Connection, Engine, create_engine, event, inspect, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
@@ -68,8 +68,71 @@ def check_db_connection(db: Session) -> bool:
         return False
 
 
+_ADDITIVE_MIGRATIONS: tuple[tuple[str, str, str, str], ...] = (
+    # (table_name, column_name, postgres_ddl, sqlite_ddl)
+    (
+        "site_configs",
+        "adapter_status",
+        "VARCHAR(20) NOT NULL DEFAULT 'healthy'",
+        "VARCHAR(20) NOT NULL DEFAULT 'healthy'",
+    ),
+    (
+        "product_listings",
+        "match_needs_review",
+        "BOOLEAN NOT NULL DEFAULT FALSE",
+        "BOOLEAN NOT NULL DEFAULT 0",
+    ),
+    (
+        "product_listings",
+        "match_confidence",
+        "DOUBLE PRECISION",
+        "FLOAT",
+    ),
+    (
+        "product_listings",
+        "suggested_canonical_product_id",
+        "INTEGER REFERENCES canonical_products(id) ON DELETE SET NULL",
+        "INTEGER REFERENCES canonical_products(id) ON DELETE SET NULL",
+    ),
+)
+
+
+def _apply_additive_schema_migrations(conn: Connection) -> None:
+    """Idempotently add Step 3+ columns to pre-existing PostgreSQL or SQLite tables."""
+    inspector = inspect(conn)
+    is_postgres = conn.dialect.name == "postgresql"
+    columns_by_table: dict[str, set[str]] = {}
+
+    for table_name, col_name, pg_ddl, sqlite_ddl in _ADDITIVE_MIGRATIONS:
+        if not inspector.has_table(table_name):
+            continue
+        if is_postgres:
+            conn.execute(
+                text(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {col_name} {pg_ddl}")
+            )
+            continue
+
+        existing = columns_by_table.get(table_name)
+        if existing is None:
+            existing = {col["name"] for col in inspector.get_columns(table_name)}
+            columns_by_table[table_name] = existing
+        if col_name not in existing:
+            conn.execute(
+                text(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {sqlite_ddl}")
+            )
+            existing.add(col_name)
+
+    if inspector.has_table("product_listings"):
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_product_listings_suggested_canonical_product_id "
+                "ON product_listings (suggested_canonical_product_id)"
+            )
+        )
+
+
 def init_db(target_engine: Engine | None = None, create_snapshots_dir: bool = True) -> None:
-    """Ensure local storage directories exist and create all database tables."""
+    """Ensure local storage directories exist and create/upgrade all database tables."""
     import app.db.models  # noqa: F401  # Register all ORM models on Base.metadata
 
     bound_engine = target_engine or engine
@@ -86,5 +149,8 @@ def init_db(target_engine: Engine | None = None, create_snapshots_dir: bool = Tr
         with bound_engine.begin() as conn:
             conn.execute(text("SELECT pg_advisory_xact_lock(23001)"))
             Base.metadata.create_all(bind=conn)
+            _apply_additive_schema_migrations(conn)
     else:
         Base.metadata.create_all(bind=bound_engine)
+        with bound_engine.begin() as conn:
+            _apply_additive_schema_migrations(conn)
